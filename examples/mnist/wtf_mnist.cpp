@@ -49,11 +49,11 @@ static WTFConfig MakeWTFConfig()
     cfg.reservoir.verbose       = false;
 
     // Episode IC (separate from weight seed)
-    cfg.ic_seed = 2;
+    cfg.ic_seed = 12;
 
     // Episode: T = 0 means default T = N
     cfg.episode.T              = 128;
-    cfg.episode.readout_slices = 1;
+    cfg.episode.readout_slices = 2;
 
     // Readout (trainable HCNN)
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
@@ -163,12 +163,6 @@ int main(int argc, char** argv)
             std::printf("wtf_mnist: DualPlane S=%d pattern=%d pad_tail=%d\n",
                         plan.plane_side, plan.pattern_length,
                         plan.N - plan.pattern_length);
-        }
-        if (cfg.readout.restore_best_epoch && cfg.readout.best_epoch_holdout_frac > 0.0f)
-        {
-            std::printf("wtf_mnist: note - readout best-epoch uses tail holdout "
-                        "(frac=%.2f); acc_on_collected is whole buffer, not pure train.\n",
-                        cfg.readout.best_epoch_holdout_frac);
         }
         std::fflush(stdout);
 
