@@ -6,8 +6,7 @@ Static length-N fields → driven hypercube reservoir orbit → HypercubeCNN rea
 Design charter: [`docs/project.md`](docs/project.md)  
 Vendored / forked sources: [`VENDORED.md`](VENDORED.md)
 
-**Status:** Phase 2 — `RunEpisode` drives the field orbit and packs end features;
-readout train/predict is Phase 3.
+**Status:** Phase 3 — collect episodes, batch-train HCNN, predict.
 
 ## Build (CLion)
 

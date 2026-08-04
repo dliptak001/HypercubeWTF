@@ -3,7 +3,7 @@
 > Living source of truth for goals, locked design, open questions, and workplan.
 > Update when decisions land; do not leave resolved debates only in chat.
 >
-> **Status:** Phase 2 episode core done; Phase 3 (readout train/predict) next.
+> **Status:** Phase 3 done (collect / train / predict); Phase 4 demos next.
 
 ---
 
@@ -270,7 +270,7 @@ Sequential gates. Docs may draft ahead; code waits on exit criteria.
 | **0** Charter | This file; design lock | **Done** — source trees recorded (§3) |
 | **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | **Done** — Release build + `wtf_smoke` |
 | **2** Episode core | Field inject; orbit; IC load; end sample; tests | **Done** — `RunEpisode` + smoke tests |
-| **3** Readout | End pack (B); train/predict path | E2E synthetic classification |
+| **3** Readout | End pack (B); train/predict path | **Done** — CollectEpisode / TrainOnCollected / Predict* |
 | **4** Demos | Example packing helpers; spectral toy; optional real data | Example binary + short doc |
 | **5** Polish | C++ perf, docs, richer example packing as needed | Solid C++ core |
 

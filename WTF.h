@@ -31,10 +31,10 @@ struct WTFConfig
     uint64_t ic_seed = 1;
 };
 
-/// @brief HypercubeWTF: static length-N field → driven reservoir orbit → end features.
+/// @brief HypercubeWTF: static length-N field → driven reservoir orbit → HCNN.
 ///
-/// Phase 2: @ref RunEpisode loads frozen s0, drives affine field translation for
-/// T passes, packs B end slices into @ref LastFeatures. Train/predict is Phase 3.
+/// Episode: @ref RunEpisode / @ref CollectEpisode. Batch train: @ref TrainOnCollected.
+/// Inference: @ref Predict / @ref PredictClass (each runs a fresh episode).
 class WTF
 {
 public:
@@ -47,23 +47,47 @@ public:
     [[nodiscard]] size_t T() const { return T_; }
     [[nodiscard]] size_t B() const { return B_; }
     [[nodiscard]] size_t M() const { return M_; }
-
-    /// Feature length after an episode: B * N.
     [[nodiscard]] size_t FeatureSize() const { return B_ * n_; }
+    [[nodiscard]] size_t NumCollected() const { return num_collected_; }
+    [[nodiscard]] size_t NumOutputs() const { return readout_->NumOutputs(); }
 
     [[nodiscard]] const Reservoir& reservoir() const { return *reservoir_; }
+    [[nodiscard]] const Readout& readout() const { return *readout_; }
     [[nodiscard]] const ReadoutConfig& readout_config() const { return readout_cfg_; }
 
-    /// Drive one episode. @p x must have size N (throws otherwise). Does not
-    /// modify @p x. After return, @ref LastFeatures holds the end-of-episode pack.
+    /// Drive one episode. @p x must have size N. Does not modify @p x.
+    /// After return, @ref LastFeatures holds the end-of-episode pack.
     void RunEpisode(std::span<const float> x);
 
     /// End features from the most recent successful @ref RunEpisode (length B*N).
-    /// Empty if no episode has been run yet.
     [[nodiscard]] std::span<const float> LastFeatures() const { return last_features_; }
+
+    /// Drop all samples collected for batch training.
+    void ClearCollected();
+
+    /// @ref RunEpisode then append features + targets to the collect buffer.
+    /// Classification: @p target is one float class index.
+    /// Regression: @p target is NumOutputs() floats.
+    void CollectEpisode(std::span<const float> x, std::span<const float> target);
+
+    /// Batch-train the HCNN on all collected episodes (requires NumCollected() > 0).
+    void TrainOnCollected();
+
+    /// Episode + readout forward; returns NumOutputs() floats (logits or regression).
+    [[nodiscard]] std::vector<float> Predict(std::span<const float> x);
+
+    /// Episode + argmax class (classification task only).
+    [[nodiscard]] int PredictClass(std::span<const float> x);
+
+    /// Accuracy of the trained readout on the collected set (classification).
+    [[nodiscard]] double AccuracyOnCollected() const;
+
+    /// R² on the collected set (regression).
+    [[nodiscard]] double R2OnCollected() const;
 
 private:
     void PackEndFeatures();
+    void RequireTargetSize(std::span<const float> target) const;
 
     size_t n_ = 0;
     size_t M_ = 0;
@@ -72,14 +96,14 @@ private:
     uint64_t ic_seed_ = 0;
 
     std::unique_ptr<Reservoir> reservoir_;
+    std::unique_ptr<Readout> readout_;
     ReadoutConfig readout_cfg_{};
 
-    /// Frozen IC length N×M; drawn once at construction.
     std::vector<float> s0_;
-
-    /// Scratch staging field (length N) for translated x.
     std::vector<float> drive_;
-
-    /// Last packed end features (length B*N).
     std::vector<float> last_features_;
+
+    std::vector<float> collected_features_; // num_collected_ * FeatureSize()
+    std::vector<float> collected_targets_;  // task-dependent layout
+    size_t num_collected_ = 0;
 };

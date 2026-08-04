@@ -44,6 +44,13 @@ WTF::WTF(const WTFConfig& cfg)
         throw std::invalid_argument(
             "WTF: readout.dim must be 0 (auto) or reservoir.dim + log2(B)");
 
+    if (readout_cfg_.num_outputs < 1)
+        throw std::invalid_argument("WTF: readout.num_outputs must be >= 1");
+
+    readout_ = std::make_unique<Readout>(readout_cfg_);
+    if (readout_->NumFeatures() != FeatureSize())
+        throw std::logic_error("WTF: readout NumFeatures does not match B*N");
+
     s0_.assign(n_ * M_, 0.0f);
     std::mt19937_64 rng(mix64(ic_seed_ ^ 0x5343000000000001ULL));
     std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
@@ -52,6 +59,7 @@ WTF::WTF(const WTFConfig& cfg)
 
     drive_.assign(n_, 0.0f);
     last_features_.clear();
+    ClearCollected();
 }
 
 void WTF::PackEndFeatures()
@@ -70,10 +78,9 @@ void WTF::RunEpisode(std::span<const float> x)
         throw std::invalid_argument(
             "WTF::RunEpisode: x.size() must equal N = 2^dim");
 
-    // Episode start: full-depth IC (canonical ring), pass counter 0.
     reservoir_->LoadInitialCondition(s0_.data(), s0_.size());
 
-    const size_t n_mask = n_ - 1; // N is power of two
+    const size_t n_mask = n_ - 1;
     size_t c = 0;
     for (size_t pass = 0; pass < T_; ++pass)
     {
@@ -85,4 +92,81 @@ void WTF::RunEpisode(std::span<const float> x)
     }
 
     PackEndFeatures();
+}
+
+void WTF::ClearCollected()
+{
+    collected_features_.clear();
+    collected_targets_.clear();
+    num_collected_ = 0;
+}
+
+void WTF::RequireTargetSize(std::span<const float> target) const
+{
+    const size_t need = (readout_cfg_.task == ReadoutTask::Classification)
+                            ? 1u
+                            : static_cast<size_t>(readout_cfg_.num_outputs);
+    if (target.size() != need)
+        throw std::invalid_argument(
+            "WTF::CollectEpisode: target size does not match task "
+            "(classification: 1 class index; regression: num_outputs)");
+}
+
+void WTF::CollectEpisode(std::span<const float> x, std::span<const float> target)
+{
+    RequireTargetSize(target);
+    RunEpisode(x);
+
+    const size_t f = FeatureSize();
+    const size_t off = num_collected_ * f;
+    collected_features_.resize(off + f);
+    std::memcpy(collected_features_.data() + off, last_features_.data(),
+                f * sizeof(float));
+
+    collected_targets_.insert(collected_targets_.end(), target.begin(), target.end());
+    ++num_collected_;
+}
+
+void WTF::TrainOnCollected()
+{
+    if (num_collected_ == 0)
+        throw std::invalid_argument("WTF::TrainOnCollected: no samples collected");
+    readout_->Train(collected_features_.data(), collected_targets_.data(),
+                    num_collected_);
+}
+
+std::vector<float> WTF::Predict(std::span<const float> x)
+{
+    RunEpisode(x);
+    std::vector<float> out(readout_->NumOutputs());
+    readout_->PredictRaw(last_features_.data(), out.data());
+    return out;
+}
+
+int WTF::PredictClass(std::span<const float> x)
+{
+    if (readout_cfg_.task != ReadoutTask::Classification)
+        throw std::invalid_argument("WTF::PredictClass: task is not Classification");
+    RunEpisode(x);
+    return readout_->PredictClass(last_features_.data());
+}
+
+double WTF::AccuracyOnCollected() const
+{
+    if (num_collected_ == 0)
+        throw std::invalid_argument("WTF::AccuracyOnCollected: no samples");
+    if (readout_cfg_.task != ReadoutTask::Classification)
+        throw std::invalid_argument("WTF::AccuracyOnCollected: not classification");
+    return readout_->Accuracy(collected_features_.data(), collected_targets_.data(),
+                              num_collected_);
+}
+
+double WTF::R2OnCollected() const
+{
+    if (num_collected_ == 0)
+        throw std::invalid_argument("WTF::R2OnCollected: no samples");
+    if (readout_cfg_.task != ReadoutTask::Regression)
+        throw std::invalid_argument("WTF::R2OnCollected: not regression");
+    return readout_->R2(collected_features_.data(), collected_targets_.data(),
+                        num_collected_);
 }
