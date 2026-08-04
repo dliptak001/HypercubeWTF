@@ -16,7 +16,6 @@
 #include <cstddef>
 #include <span>
 #include <stdexcept>
-#include <vector>
 
 namespace wtf_ex {
 
@@ -34,41 +33,31 @@ inline void PackPadLow(std::span<const float> data, std::span<float> out,
         out[i] = pad_value;
 }
 
-/// MNIST DualPlane pack: 28×28 in [-1,1] → length N = 2^dim (low addresses).
-/// Uses vendored HCNN SpatialEmbed DualPlaneResize (ink || |grad| + pad tail).
-inline void PackDualPlane28(const float* img28x28, int dim, std::span<float> out,
-                            float pad_value = -1.0f)
+/// Build a DualPlane embedder (reuse for the whole run — do not construct per sample).
+inline hcnn::HCNNSpatialEmbedder MakeDualPlaneEmbedder(int dim,
+                                                       float pad_value = -1.0f)
 {
-    if (img28x28 == nullptr)
-        throw std::invalid_argument("PackDualPlane28: null image");
     if (dim < 5 || dim > 16)
-        throw std::invalid_argument("PackDualPlane28: dim must be in [5, 16]");
-
+        throw std::invalid_argument("MakeDualPlaneEmbedder: dim must be in [5, 16]");
     hcnn::HCNNSpatialEmbedConfig ec;
     ec.dim = dim;
     ec.mode = hcnn::HCNNSpatialEmbedMode::DualPlaneResize;
     ec.pad_value = pad_value;
     ec.plane_side = 0; // auto S from N
-    hcnn::HCNNSpatialEmbedder emb(ec);
-
-    const int N = emb.capacity();
-    if (static_cast<size_t>(N) != out.size())
-        throw std::invalid_argument(
-            "PackDualPlane28: out.size() must equal N = 2^dim");
-
-    emb.embed(img28x28, 28, 28, out.data());
+    return hcnn::HCNNSpatialEmbedder(ec);
 }
 
-/// Build a DualPlane embedder (for logging plan / capacity).
-inline hcnn::HCNNSpatialEmbedder MakeDualPlaneEmbedder(int dim,
-                                                       float pad_value = -1.0f)
+/// MNIST DualPlane pack using a pre-built embedder (prefer this in hot loops).
+inline void PackDualPlane28(const float* img28x28,
+                            const hcnn::HCNNSpatialEmbedder& emb,
+                            std::span<float> out)
 {
-    hcnn::HCNNSpatialEmbedConfig ec;
-    ec.dim = dim;
-    ec.mode = hcnn::HCNNSpatialEmbedMode::DualPlaneResize;
-    ec.pad_value = pad_value;
-    ec.plane_side = 0;
-    return hcnn::HCNNSpatialEmbedder(ec);
+    if (img28x28 == nullptr)
+        throw std::invalid_argument("PackDualPlane28: null image");
+    if (static_cast<size_t>(emb.capacity()) != out.size())
+        throw std::invalid_argument(
+            "PackDualPlane28: out.size() must equal embedder capacity N");
+    emb.embed(img28x28, 28, 28, out.data());
 }
 
 } // namespace wtf_ex

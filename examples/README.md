@@ -35,7 +35,13 @@ demo/task constants — same pattern as HypercubeESN examples.
 
 ### MNIST data
 
-Always `HypercubeWTF/data/` (repo root). No env override, no other project.
+`wtf_mnist` searches for this repo’s `data/` (IDX present) under:
+
+1. Current working directory and parents  
+2. Executable directory and parents (CLion build dirs)  
+3. Source tree next to `examples/`  
+
+No other project path. No env override.
 
 ```text
 data/train-images-idx3-ubyte
@@ -44,7 +50,7 @@ data/t10k-images-idx3-ubyte
 data/t10k-labels-idx1-ubyte
 ```
 
-See [`data/README.md`](../data/README.md).
+See [`data/README.md`](../data/README.md). Default `kMaxTrain=2000` (raise for campaigns).
 
 ### Product note
 

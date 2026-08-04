@@ -1,7 +1,8 @@
 #pragma once
 
 // Minimal MNIST IDX loader for examples (not core).
-// Pixels → float in [-1, 1]; labels → int class indices.
+// Pixels → float in [-1, 1]; labels → int class indices 0..9.
+// Enforces 28×28 images.
 
 #include <cstddef>
 #include <cstdint>
@@ -34,7 +35,7 @@ inline uint32_t ReadBe32(std::ifstream& f)
            | uint32_t(b[3]);
 }
 
-/// Load IDX images+labels. @p max_samples 0 = all.
+/// Load IDX images+labels. @p max_samples 0 = all. Requires 28×28, labels in [0,9].
 inline MnistSet LoadMnist(const std::string& images_path,
                           const std::string& labels_path,
                           size_t max_samples = 0)
@@ -48,7 +49,11 @@ inline MnistSet LoadMnist(const std::string& images_path,
     const uint32_t num_images = ReadBe32(img);
     const uint32_t rows = ReadBe32(img);
     const uint32_t cols = ReadBe32(img);
-    const int pixels = static_cast<int>(rows * cols);
+    if (rows != 28 || cols != 28)
+        throw std::runtime_error(
+            "MNIST images must be 28x28 (got " + std::to_string(rows) + "x"
+            + std::to_string(cols) + ")");
+    const int pixels = 28 * 28;
 
     std::ifstream lbl(labels_path, std::ios::binary);
     if (!lbl)
@@ -87,6 +92,10 @@ inline MnistSet LoadMnist(const std::string& images_path,
         lbl.read(reinterpret_cast<char*>(&lab), 1);
         if (!lbl)
             throw std::runtime_error("Truncated MNIST labels at " + std::to_string(i));
+        if (lab > 9)
+            throw std::runtime_error(
+                "MNIST label out of range [0,9] at sample " + std::to_string(i)
+                + " (got " + std::to_string(static_cast<int>(lab)) + ")");
         s.label = static_cast<int>(lab);
     }
     return ds;

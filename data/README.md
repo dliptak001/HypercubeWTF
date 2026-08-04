@@ -1,7 +1,8 @@
 # MNIST data (HypercubeWTF)
 
-`wtf_mnist` loads **only** from this directory (`HypercubeWTF/data/`).  
-It does not look at HypercubeCNN or any other project.
+`wtf_mnist` loads from **this repo’s** `data/` directory. It discovers that folder
+from the process cwd, the executable path, or the source tree — not from
+HypercubeCNN or any other project.
 
 ## Required files (uncompressed IDX)
 
