@@ -164,7 +164,7 @@ int main(int argc, char** argv)
         }
         if (cfg.readout.restore_best_epoch && cfg.readout.best_epoch_holdout_frac > 0.0f)
         {
-            std::printf("wtf_mnist: note — readout best-epoch uses tail holdout "
+            std::printf("wtf_mnist: note - readout best-epoch uses tail holdout "
                         "(frac=%.2f); acc_on_collected is whole buffer, not pure train.\n",
                         cfg.readout.best_epoch_holdout_frac);
         }
@@ -202,7 +202,7 @@ int main(int argc, char** argv)
         std::printf("wtf_mnist: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu) "
                     "collect+train=%.1fs\n",
                     acc_on_collected, test_acc, correct, test.size(), secs);
-        std::printf("wtf_mnist: note — not an HCNN-mnist bake-off; product is "
+        std::printf("wtf_mnist: note - not an HCNN-mnist bake-off; product is "
                     "field orbit + end-state readout.\n");
         std::fflush(stdout);
 

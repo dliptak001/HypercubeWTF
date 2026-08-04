@@ -81,7 +81,7 @@ inline std::filesystem::path FindMnistDataDir(const char* argv0)
     std::string msg =
         "Cannot find MNIST data/ (need the four *-ubyte IDX files).\n"
         "Tried candidates under cwd, executable path, and source tree.\n"
-        "Place files in HypercubeWTF/data/ — see data/README.md\n"
+        "Place files in HypercubeWTF/data/ - see data/README.md\n"
         "Candidates:\n";
     for (const auto& c : candidates)
         msg += "  " + c.lexically_normal().make_preferred().string() + "\n";
