@@ -110,6 +110,21 @@ void WTF::RequireTargetSize(std::span<const float> target) const
         throw std::invalid_argument(
             "WTF::CollectEpisode: target size does not match task "
             "(classification: 1 class index; regression: num_outputs)");
+
+    // Classification: reject non-integral or out-of-range class indices before
+    // they become silent static_cast<int> mistakes inside HCNN training.
+    if (readout_cfg_.task == ReadoutTask::Classification)
+    {
+        const float y = target[0];
+        const int cls = static_cast<int>(y);
+        if (y != static_cast<float>(cls) || cls < 0
+            || cls >= readout_cfg_.num_outputs)
+        {
+            throw std::invalid_argument(
+                "WTF::CollectEpisode: class index must be an integer in "
+                "[0, num_outputs)");
+        }
+    }
 }
 
 void WTF::CollectEpisode(std::span<const float> x, std::span<const float> target)

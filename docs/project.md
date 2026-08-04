@@ -290,8 +290,9 @@ solid. Do not scaffold Python early.
 
 ## 10. Next
 
-1. Choose first demo (**Q8**), or defer and start Phase 1.
-2. Phase 1 skeleton: copy from hESN **`feedback`** + HCNN `main` (commits in §3); WTF Reservoir fork (no feedback port).
+1. **Phase 4** — first demo (**Q8**): synthetic packing helper + short example binary.
+2. Keep `wtf_smoke` as the episode-contract gate; grow demos outside core until the C++ path is solid.
+3. Python / bindings only after Phase 5 (not before).
 
 ---
 
@@ -302,3 +303,4 @@ solid. Do not scaffold Python early.
 | 2026-08-04 | Charter established; S1 field orbit; vendor model; end-only readout; no bake-off |
 | 2026-08-04 | Defaults **B=1**, **T=N**; `T>N` wraps; separate **ic_seed**; intelligent **s0** load; WTF Reservoir fork (no ESN fb / stream baggage); end-state wording clarified |
 | 2026-08-04 | First copy: HypercubeESN **`feedback`** (not main) @ ae3fb64…; HypercubeCNN main @ 20bbb23… |
+| 2026-08-04 | Phase 3 collect/train/predict; smoke episode contract (`T>N`, `B=2`, IC seed split) |

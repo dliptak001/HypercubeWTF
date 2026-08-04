@@ -1,10 +1,12 @@
-// Smoke: episode path + synthetic 2-class train/predict.
+// Smoke: episode contract + synthetic 2-class train/predict.
 #include "WTF.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <span>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -49,28 +51,45 @@ bool Near(std::span<const float> a, std::span<const float> b, float eps = 1e-6f)
     return true;
 }
 
+bool ExpectThrow(const char* label, auto&& fn)
+{
+    try
+    {
+        fn();
+        std::fprintf(stderr, "expected throw: %s\n", label);
+        return false;
+    }
+    catch (const std::invalid_argument&)
+    {
+        return true;
+    }
+}
+
 } // namespace
 
 int main()
 {
     try
     {
-        // ----- Phase 2 episode checks -----
+        // ----- Episode contract (charter §4) -----
         {
             WTF wtf(MakeCfg());
+            if (wtf.N() != 32 || wtf.T() != wtf.N() || wtf.B() != 1 || wtf.M() != 4
+                || wtf.FeatureSize() != wtf.N())
+            {
+                std::fprintf(stderr, "defaults: N=%zu T=%zu B=%zu M=%zu F=%zu\n",
+                             wtf.N(), wtf.T(), wtf.B(), wtf.M(), wtf.FeatureSize());
+                return 1;
+            }
+
             auto x = MakeField(wtf.N(), 0);
             const auto x_copy = x;
 
-            try
-            {
-                std::vector<float> bad(wtf.N() + 1, 0.0f);
-                wtf.RunEpisode(bad);
-                std::fprintf(stderr, "expected throw on size mismatch\n");
+            if (!ExpectThrow("x.size != N", [&] {
+                    std::vector<float> bad(wtf.N() + 1, 0.0f);
+                    wtf.RunEpisode(bad);
+                }))
                 return 1;
-            }
-            catch (const std::invalid_argument&)
-            {
-            }
 
             wtf.RunEpisode(x);
             if (x != x_copy)
@@ -91,7 +110,98 @@ int main()
             wtf.RunEpisode(x);
             if (!Near(wtf.LastFeatures(), feat_a))
             {
-                std::fprintf(stderr, "isolation failed\n");
+                std::fprintf(stderr, "isolation failed (residual state / IC)\n");
+                return 1;
+            }
+        }
+
+        // T > N: field address wraps; longer orbit is deterministic and differs from T = N.
+        {
+            auto cfg_n = MakeCfg();
+            auto cfg_2n = MakeCfg();
+            cfg_n.episode.T = 0; // N
+            cfg_2n.episode.T = 64; // 2N
+            WTF w_n(cfg_n);
+            WTF w_2n(cfg_2n);
+            if (w_n.T() != w_n.N() || w_2n.T() != 2 * w_2n.N())
+            {
+                std::fprintf(stderr, "T config: T_n=%zu T_2n=%zu N=%zu\n",
+                             w_n.T(), w_2n.T(), w_n.N());
+                return 1;
+            }
+            auto x = MakeField(w_n.N(), 0);
+            w_n.RunEpisode(x);
+            w_2n.RunEpisode(x);
+            const std::vector<float> f_n(w_n.LastFeatures().begin(),
+                                         w_n.LastFeatures().end());
+            const std::vector<float> f_2n(w_2n.LastFeatures().begin(),
+                                          w_2n.LastFeatures().end());
+            if (Near(f_n, f_2n))
+            {
+                std::fprintf(stderr, "T>N: features identical to T=N (orbit stuck?)\n");
+                return 1;
+            }
+            w_2n.RunEpisode(x);
+            if (!Near(w_2n.LastFeatures(), f_2n))
+            {
+                std::fprintf(stderr, "T>N: not deterministic\n");
+                return 1;
+            }
+        }
+
+        // B = 2: feature pack is ages 0..1; readout dim auto = dim + 1.
+        {
+            auto cfg = MakeCfg();
+            cfg.episode.readout_slices = 2;
+            cfg.readout.dim = 0;
+            WTF wtf(cfg);
+            if (wtf.B() != 2 || wtf.FeatureSize() != 2 * wtf.N())
+            {
+                std::fprintf(stderr, "B=2 sizes: B=%zu F=%zu N=%zu\n",
+                             wtf.B(), wtf.FeatureSize(), wtf.N());
+                return 1;
+            }
+            if (wtf.readout().NumFeatures() != wtf.FeatureSize())
+            {
+                std::fprintf(stderr, "B=2 readout NumFeatures mismatch\n");
+                return 1;
+            }
+            auto x = MakeField(wtf.N(), 0);
+            wtf.RunEpisode(x);
+            const auto feats = wtf.LastFeatures();
+            const float* a0 = wtf.reservoir().SliceAt(0);
+            const float* a1 = wtf.reservoir().SliceAt(1);
+            if (std::memcmp(feats.data(), a0, wtf.N() * sizeof(float)) != 0
+                || std::memcmp(feats.data() + wtf.N(), a1, wtf.N() * sizeof(float)) != 0)
+            {
+                std::fprintf(stderr, "B=2 pack does not match SliceAt(0..1)\n");
+                return 1;
+            }
+        }
+
+        // Invalid B / IC seed splits s0 from weight seed.
+        {
+            auto bad_b = MakeCfg();
+            bad_b.episode.readout_slices = 3; // not power of two
+            if (!ExpectThrow("B not power of two", [&] { WTF w(bad_b); }))
+                return 1;
+
+            auto bad_bm = MakeCfg();
+            bad_bm.episode.readout_slices = 8; // > M=4
+            if (!ExpectThrow("B > M", [&] { WTF w(bad_bm); }))
+                return 1;
+
+            auto c0 = MakeCfg();
+            auto c1 = MakeCfg();
+            c1.ic_seed = c0.ic_seed + 99; // same reservoir seed, different IC
+            WTF w0(c0);
+            WTF w1(c1);
+            auto x = MakeField(w0.N(), 0);
+            w0.RunEpisode(x);
+            w1.RunEpisode(x);
+            if (Near(w0.LastFeatures(), w1.LastFeatures()))
+            {
+                std::fprintf(stderr, "ic_seed: features identical (s0 not separate?)\n");
                 return 1;
             }
         }
@@ -120,6 +230,16 @@ int main()
                 return 1;
             }
 
+            // Out-of-range class index must fail at collect (product boundary).
+            {
+                auto x = MakeField(wtf.N(), 0);
+                float bad = 2.0f; // num_outputs = 2 → valid 0,1
+                if (!ExpectThrow("class index OOR", [&] {
+                        wtf.CollectEpisode(x, std::span<const float>(&bad, 1));
+                    }))
+                    return 1;
+            }
+
             wtf.TrainOnCollected();
             const double acc = wtf.AccuracyOnCollected();
             if (acc < 0.85)
@@ -141,7 +261,7 @@ int main()
                 return 1;
             }
 
-            std::printf("wtf_smoke: ok episode+train acc=%.3f N=%zu T=%zu\n",
+            std::printf("wtf_smoke: ok contract+train acc=%.3f N=%zu T=%zu\n",
                         acc, wtf.N(), wtf.T());
         }
 

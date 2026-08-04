@@ -17,7 +17,9 @@ bundled toolchain on PATH:
 cmake --build cmake-build-release
 ```
 
-Smoke: `wtf_smoke` constructs a dim-5 instance and checks N/T/B/M defaults.
+Smoke: `wtf_smoke` (dim-5) checks the episode contract (`T=N` default, `T>N`
+wrap, `B=2` pack, IC seed split, size throw) and a synthetic 2-class
+train/predict path.
 
 ## License
 
