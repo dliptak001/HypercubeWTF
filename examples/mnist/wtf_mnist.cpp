@@ -84,7 +84,7 @@ static constexpr size_t kMaxTest      = 500;
 static constexpr float kPad           = -1.0f;
 static constexpr int kImgSide         = 28;
 static constexpr int kImgPixels       = kImgSide * kImgSide;
-static constexpr double kMinTestAcc   = 0.50; // soft CI floor (not an HCNN bake-off)
+static constexpr double kMinTestAcc   = 0.50; // soft CI floor
 
 // =============================================================================
 // Helpers
@@ -204,8 +204,6 @@ int main(int argc, char** argv)
         std::printf("wtf_mnist: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu) "
                     "collect+train=%.1fs\n",
                     acc_on_collected, test_acc, correct, test.size(), secs);
-        std::printf("wtf_mnist: note - not an HCNN-mnist bake-off; product is "
-                    "field orbit + end-state readout.\n");
         std::fflush(stdout);
 
         if (test_acc < kMinTestAcc)
