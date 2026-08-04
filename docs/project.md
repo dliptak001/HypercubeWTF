@@ -3,7 +3,7 @@
 > Living source of truth for goals, locked design, open questions, and workplan.
 > Update when decisions land; do not leave resolved debates only in chat.
 >
-> **Status:** Phase 3 done (collect / train / predict); Phase 4 demos next.
+> **Status:** Phase 4 demos in tree (`wtf_synth`, `wtf_mnist`); polish / richer packs next.
 
 ---
 
@@ -217,7 +217,7 @@ features = pack end ages 0 .. B-1     // default B = 1
 
 | ID | Question | Notes |
 |----|----------|-------|
-| Q8 | First demo | synthetic first; Raman only with clear data protocol |
+| Q8 | First demo | **Done** — `wtf_synth` + `wtf_mnist` (DualPlane / PadLow); Raman later |
 | — | Train collect / batch API shape | revisit later (`RunEpisode` + collect vs other) |
 
 ---
@@ -271,7 +271,7 @@ Sequential gates. Docs may draft ahead; code waits on exit criteria.
 | **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | **Done** — Release build + `wtf_smoke` |
 | **2** Episode core | Field inject; orbit; IC load; end sample; tests | **Done** — `RunEpisode` + smoke tests |
 | **3** Readout | End pack (B); train/predict path | **Done** — CollectEpisode / TrainOnCollected / Predict* |
-| **4** Demos | Example packing helpers; spectral toy; optional real data | Example binary + short doc |
+| **4** Demos | Example packing (PadLow + DualPlane); `wtf_synth`; `wtf_mnist` | **Done** — see `examples/` |
 | **5** Polish | C++ perf, docs, richer example packing as needed | Solid C++ core |
 
 **Python SDK / bindings:** not in this workplan. Only after the C++ core is
@@ -290,9 +290,9 @@ solid. Do not scaffold Python early.
 
 ## 10. Next
 
-1. **Phase 4** — first demo (**Q8**): synthetic packing helper + short example binary.
-2. Keep `wtf_smoke` as the episode-contract gate; grow demos outside core until the C++ path is solid.
-3. Python / bindings only after Phase 5 (not before).
+1. **Phase 5** — polish, docs, optional full-MNIST / larger-dim campaigns.
+2. Keep `wtf_smoke` + `wtf_synth` as fast gates; `wtf_mnist` needs IDX data.
+3. Python / bindings only after the C++ core is solid (not before).
 
 ---
 
@@ -304,3 +304,4 @@ solid. Do not scaffold Python early.
 | 2026-08-04 | Defaults **B=1**, **T=N**; `T>N` wraps; separate **ic_seed**; intelligent **s0** load; WTF Reservoir fork (no ESN fb / stream baggage); end-state wording clarified |
 | 2026-08-04 | First copy: HypercubeESN **`feedback`** (not main) @ ae3fb64…; HypercubeCNN main @ 20bbb23… |
 | 2026-08-04 | Phase 3 collect/train/predict; smoke episode contract (`T>N`, `B=2`, IC seed split) |
+| 2026-08-04 | Phase 4: `wtf_synth`, `wtf_mnist`; pack = PadLow + DualPlane only (no resize/letterbox/bit-map) |

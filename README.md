@@ -6,7 +6,7 @@ Static length-N fields → driven hypercube reservoir orbit → HypercubeCNN rea
 Design charter: [`docs/project.md`](docs/project.md)  
 Vendored / forked sources: [`VENDORED.md`](VENDORED.md)
 
-**Status:** Phase 3 — collect episodes, batch-train HCNN, predict.
+**Status:** Phase 4 — demos (`wtf_synth`, `wtf_mnist`) + collect/train/predict core.
 
 ## Build (CLion)
 
@@ -17,9 +17,13 @@ bundled toolchain on PATH:
 cmake --build cmake-build-release
 ```
 
-Smoke: `wtf_smoke` (dim-5) checks the episode contract (`T=N` default, `T>N`
-wrap, `B=2` pack, IC seed split, size throw) and a synthetic 2-class
-train/predict path.
+| Binary | Role |
+|--------|------|
+| `wtf_smoke` | Episode contract + small train/predict smoke |
+| `wtf_synth` | Synthetic multi-class fields (no data files) |
+| `wtf_mnist` | MNIST DualPlane/PadLow → orbit → readout (needs IDX under `data/`) |
+
+Examples and packing rules: [`examples/README.md`](examples/README.md).
 
 ## License
 

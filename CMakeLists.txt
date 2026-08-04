@@ -36,18 +36,26 @@ if(MINGW)
     target_link_options(HypercubeWTFCore PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
-# ——— Smoke executable (construct WTF, exit 0) ———
+# ——— Smoke + Phase 4 demos (top-level project only) ———
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    add_executable(wtf_smoke tests/wtf_smoke.cpp)
-    target_link_libraries(wtf_smoke PRIVATE HypercubeWTFCore)
-    target_compile_options(wtf_smoke PRIVATE
-        $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
-        $<$<CONFIG:Debug>:-O0 -g>
-        -Wall -Wextra -Wno-unknown-pragmas
-    )
-    if(MINGW)
-        target_link_options(wtf_smoke PRIVATE -static-libgcc -static-libstdc++)
-        target_link_options(wtf_smoke PRIVATE
-            $<$<CONFIG:Debug>:-Wl,--allow-multiple-definition>)
-    endif()
+    function(wtf_add_exe name src)
+        add_executable(${name} ${src})
+        target_link_libraries(${name} PRIVATE HypercubeWTFCore)
+        target_include_directories(${name} PRIVATE
+            ${PROJECT_SOURCE_DIR}/examples)
+        target_compile_options(${name} PRIVATE
+            $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
+            $<$<CONFIG:Debug>:-O0 -g>
+            -Wall -Wextra -Wno-unknown-pragmas
+        )
+        if(MINGW)
+            target_link_options(${name} PRIVATE -static-libgcc -static-libstdc++)
+            target_link_options(${name} PRIVATE
+                $<$<CONFIG:Debug>:-Wl,--allow-multiple-definition>)
+        endif()
+    endfunction()
+
+    wtf_add_exe(wtf_smoke tests/wtf_smoke.cpp)
+    wtf_add_exe(wtf_synth examples/wtf_synth.cpp)
+    wtf_add_exe(wtf_mnist examples/wtf_mnist.cpp)
 endif()
