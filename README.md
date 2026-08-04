@@ -1,5 +1,9 @@
 # HypercubeWTF
 
+> **VERY EARLY DEVELOPMENT.** APIs, defaults, demos, and numbers can change
+> without notice. Not a release product yet — use for exploration and
+> co-development only.
+
 Static length-N fields → driven hypercube reservoir orbit → HypercubeCNN readout
 (end-of-episode sample).
 
