@@ -30,7 +30,8 @@ Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.t
 | `wtf_synth` | `examples/synth/` | None (CI-friendly) |
 | `wtf_mnist` | `examples/mnist/` | **`data/` at repo root only** |
 
-Edit knobs in each demo’s `DemoConfig`.
+Edit knobs at the top of each demo: `MakeWTFConfig()` (product) and `k*`
+demo/task constants — same pattern as HypercubeESN examples.
 
 ### MNIST data
 

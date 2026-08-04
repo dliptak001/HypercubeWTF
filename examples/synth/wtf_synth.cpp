@@ -1,39 +1,64 @@
-/// Synthetic multi-class demo: invent length-N fields (pad/low style patterns),
-/// drive WTF episodes, train readout, score held-out accuracy.
-///
-/// No image pipeline. CI-friendly. Edit knobs in DemoConfig.
+/// @file wtf_synth.cpp
+/// @brief Synthetic multi-class fields → WTF episode → train readout → held-out test.
+/// CI-friendly (no data files). Edit knobs in the sections below.
 
 #include "WTF.h"
 
 #include <chrono>
-#include <cmath>
 #include <cstdio>
-#include <cstdlib>
-#include <span>
 #include <vector>
 
-namespace {
+// =============================================================================
+// WTF configuration — primary knobs for this demo (edit here)
+// =============================================================================
 
-struct DemoConfig
+static constexpr int kNumClasses = 4;
+
+static WTFConfig MakeWTFConfig()
 {
-    size_t dim = 6;              // N = 64
-    size_t history_depth = 4;
-    size_t T = 0;                // 0 → N
-    size_t B = 1;
-    int num_classes = 4;
-    int train_per_class = 40;
-    int test_per_class = 20;
-    int epochs = 60;
-    int batch_size = 16;
-    uint64_t reservoir_seed = 1;
-    uint64_t ic_seed = 2;
-    uint64_t readout_seed = 3;
-};
+    WTFConfig cfg;
+
+    // Reservoir (fixed dynamics)
+    cfg.reservoir.dim           = 6; // N = 64
+    cfg.reservoir.history_depth = 4;
+    cfg.reservoir.seed          = 1;
+    cfg.reservoir.verbose       = false;
+
+    // Episode IC (separate from weight seed)
+    cfg.ic_seed = 2;
+
+    // Episode: T = 0 means default T = N; B = end-of-episode slices
+    cfg.episode.T              = 0;
+    cfg.episode.readout_slices = 1;
+
+    // Readout (trainable HCNN)
+    cfg.readout.dim                = 0; // auto = dim + log2(B)
+    cfg.readout.num_outputs        = kNumClasses;
+    cfg.readout.task               = ReadoutTask::Classification;
+    cfg.readout.epochs             = 60;
+    cfg.readout.batch_size         = 16;
+    cfg.readout.seed               = 3;
+    cfg.readout.num_threads        = 1;
+    cfg.readout.restore_best_epoch = false;
+
+    return cfg;
+}
+
+// =============================================================================
+// Demo / task parameters (not part of WTFConfig)
+// =============================================================================
+
+static constexpr int kTrainPerClass = 40;
+static constexpr int kTestPerClass  = 20;
+static constexpr double kMinTestAcc = 0.75;
+
+// =============================================================================
+// Helpers
+// =============================================================================
 
 /// Class-conditioned fields already in R^N (values in [-1, 1]).
-/// Patterns live in low addresses; high half is pad (−1) so pack story is
-/// pad/low without image packing.
-std::vector<float> MakePattern(size_t n, int label, int rep)
+/// Patterns in low addresses; high half pad (−1) — pad/low story, no images.
+static std::vector<float> MakePattern(size_t n, int label, int rep)
 {
     std::vector<float> x(n, -1.0f);
     const size_t half = n / 2;
@@ -71,44 +96,22 @@ std::vector<float> MakePattern(size_t n, int label, int rep)
     return x;
 }
 
-WTFConfig MakeWtfConfig(const DemoConfig& d)
-{
-    WTFConfig cfg;
-    cfg.reservoir.dim = d.dim;
-    cfg.reservoir.history_depth = d.history_depth;
-    cfg.reservoir.seed = d.reservoir_seed;
-    cfg.reservoir.verbose = false;
-    cfg.ic_seed = d.ic_seed;
-    cfg.episode.T = d.T;
-    cfg.episode.readout_slices = d.B;
-    cfg.readout.dim = 0;
-    cfg.readout.num_outputs = d.num_classes;
-    cfg.readout.task = ReadoutTask::Classification;
-    cfg.readout.epochs = d.epochs;
-    cfg.readout.batch_size = d.batch_size;
-    cfg.readout.seed = d.readout_seed;
-    cfg.readout.num_threads = 1;
-    cfg.readout.restore_best_epoch = false;
-    return cfg;
-}
-
-} // namespace
+// =============================================================================
 
 int main()
 {
     try
     {
-        const DemoConfig demo{};
-        WTF wtf(MakeWtfConfig(demo));
+        const WTFConfig cfg = MakeWTFConfig();
+        WTF wtf(cfg);
 
         std::printf("wtf_synth: N=%zu T=%zu B=%zu classes=%d train=%d/class\n",
-                    wtf.N(), wtf.T(), wtf.B(), demo.num_classes,
-                    demo.train_per_class);
+                    wtf.N(), wtf.T(), wtf.B(), kNumClasses, kTrainPerClass);
 
         auto t0 = std::chrono::steady_clock::now();
-        for (int c = 0; c < demo.num_classes; ++c)
+        for (int c = 0; c < kNumClasses; ++c)
         {
-            for (int r = 0; r < demo.train_per_class; ++r)
+            for (int r = 0; r < kTrainPerClass; ++r)
             {
                 auto x = MakePattern(wtf.N(), c, r);
                 wtf.CollectEpisode(x, c);
@@ -120,9 +123,9 @@ int main()
 
         size_t correct = 0;
         size_t total = 0;
-        for (int c = 0; c < demo.num_classes; ++c)
+        for (int c = 0; c < kNumClasses; ++c)
         {
-            for (int r = 0; r < demo.test_per_class; ++r)
+            for (int r = 0; r < kTestPerClass; ++r)
             {
                 // Offset rep so test fields are not identical to train.
                 auto x = MakePattern(wtf.N(), c, r + 1000);
@@ -138,7 +141,7 @@ int main()
         std::printf("wtf_synth: train_acc=%.3f test_acc=%.3f (%zu/%zu) collect+train=%.2fs\n",
                     train_acc, test_acc, correct, total, secs);
 
-        if (test_acc < 0.75)
+        if (test_acc < kMinTestAcc)
         {
             std::fprintf(stderr, "wtf_synth: test accuracy too low\n");
             return 1;
