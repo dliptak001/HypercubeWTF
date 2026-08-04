@@ -43,6 +43,8 @@ static WTFConfig MakeWTFConfig()
     cfg.reservoir.dim           = 10; // N = 1024; DualPlane S≈22; PadLow needs dim >= 10
     cfg.reservoir.history_depth = 8;
     cfg.reservoir.seed          = 1;
+    cfg.reservoir.spectral_radius = 0.99;
+    cfg.reservoir.input_scaling = 0.015;
     cfg.reservoir.verbose       = false;
 
     // Episode IC (separate from weight seed)
@@ -55,7 +57,11 @@ static WTFConfig MakeWTFConfig()
     // Readout (trainable HCNN)
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
+    cfg.readout.num_layers              = 1;
+    cfg.readout.use_pooling             = true;
+    cfg.readout.conv_channels            = 8;
     cfg.readout.task                    = ReadoutTask::Classification;
+    cfg.readout.activation              = ReadoutActivation::TANH;
     cfg.readout.epochs                  = 40;
     cfg.readout.batch_size              = 32;
     cfg.readout.seed                    = 42;
