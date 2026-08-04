@@ -9,29 +9,27 @@
 
 ## 1. Goal
 
-**HypercubeWTF** turns a **static length-N field** into a **driven hypercube
-reservoir trajectory**, then trains a **HypercubeCNN readout** on that
-trajectory.
+**HypercubeWTF** drives a static length-N field through a fixed hypercube
+reservoir for `T` passes (affine field translation), then trains a
+**HypercubeCNN** on the **end-of-episode** reservoir state.
 
-- Same frozen-core / trained-head discipline as HypercubeESN.
-- Same cube-native readout as HypercubeCNN.
-- Product hinge: **spatial → temporal** via **affine field translation** of `x`
-  on a **fixed** reservoir (geometry + weights never reindexed by the pass
-  counter).
+- Frozen reservoir / trained head (same RC discipline as HypercubeESN).
+- Cube-native HCNN readout (same family as HypercubeCNN).
+- Product hinge: **spatial → temporal** by re-registering fixed `x` each pass;
+  geometry and weights never move with the pass counter.
 
 | Product | Natural data | Pipeline |
 |---------|--------------|----------|
 | HypercubeESN | Low-dim **streams** | `u_t` → step → multi-slice → HCNN |
 | HypercubeCNN | Static patterns on the cube | embed → conv+pool → labels |
-| **HypercubeWTF** | Static high-dim, **no** intrinsic time | length-N `x` → episode orbit → trajectory → HCNN |
+| **HypercubeWTF** | Static high-dim, **no** intrinsic time | length-N `x` → drive orbit → **end state** → HCNN |
 
-**Mechanism:** values of `x` are fixed for an episode; each pass stages a
-cube-translated registration of `x`, then a stock reservoir step. The sample is
-**driven through an orbit**; the readout sees **one** reservoir sample at
-**episode end** (the trajectory is encoded in that final state / delay line).
+The orbit is **drive-only**. The readout is **not** fed intermediate passes.
+Training/predict uses **one** sample per episode: the state after the last
+drive step (plus optional multi-slice pack `B` from that same end delay line).
 
-Packing raw data (spectra, tables, …) into `x ∈ R^N` is **caller-owned**.
-Raman is a motivating load, not a product restriction.
+Packing raw data into `x ∈ R^N` is **caller-owned**. Raman is a motivating
+load, not a product restriction.
 
 ---
 
@@ -41,10 +39,13 @@ Raman is a motivating load, not a product restriction.
   x ∈ R^N   (N = 2^dim; caller-packed; values in [-1, 1]; fixed for episode)
             │
             ▼
-  Episode (WTF)   for c = 0 .. T-1:
-                    vtx_input[v] = x[(v XOR c) & (N - 1)]
-                    Reservoir::Step()          // stock W_in gather + recurrent
-                  sample reservoir **once** at end → one feature row per sample
+  Episode     LoadIC(s0)                 // intelligent full delay-line load
+              c = 0
+              for pass = 0 .. T-1:       // drive only; default T = N
+                  vtx_input[v] = x[(v XOR c) & (N - 1)]
+                  Step()                 // field inject + W_in gather + recurrent
+                  c += 1                 // may exceed N; mask wraps address
+              sample once at end         // default B = 1 → newest slice only
             │
             ▼
   HCNN readout (trained only) → y
@@ -52,7 +53,7 @@ Raman is a motivating load, not a product restriction.
 
 | Piece | Train? |
 |-------|--------|
-| Recurrent weights, `W_in` (`N × dim`), bias | Frozen |
+| Recurrent weights, input weights `W_in` (`N × dim`), bias | Frozen |
 | Episode IC **s0** (length `N × M`) | Frozen (drawn once; reloaded each episode) |
 | Field packing / normalization | Caller-owned |
 | HCNN readout | **Trained** |
@@ -63,45 +64,57 @@ Raman is a motivating load, not a product restriction.
 |------|---------|
 | **N** | `2^dim`; length of `x` and one state slice |
 | **x** | Caller field; values fixed for the episode |
-| **Episode** | Load fixed IC → drive loop → end sample (one sample) |
-| **Pass** | One stage + `Step` under counter `c` |
-| **T** | Number of reservoir **drive** passes per episode. Readout is not involved during these passes |
-| **B** | Multi-slice pack from the **end** delay line only (power of two; ESN seam); still one sample time |
+| **Episode** | Load IC → `T` drive passes → one end sample |
+| **Pass** | One stage + `Step`; advance pass counter `c` once |
+| **T** | Drive-pass count only (default **`T = N`**). May be **> N**; field address wraps |
+| **B** | How many end delay-line ages to pack into the readout (default **`B = 1`**) |
+| **M** | `history_depth` — delay-line depth |
 | **vtx_input** | Staged length-N field for the input gather |
-| **M** | `history_depth` — delay-line depth (same as hESN) |
-| **s0** | Frozen IC buffer length **`N × M`**, drawn at construction; reloaded into the full delay line at every episode start |
+| **s0** | Frozen IC, length **`N × M`**, separate IC seed; reloaded every episode start |
+| **c** | Pass counter; starts at 0 each episode; indexing uses `(… ) & (N - 1)` |
 
 ---
 
 ## 3. Relation to HypercubeESN / HypercubeCNN
 
-**Reuse components, not the ESN façade.**
+**Start from hypercube RC physics, not from the ESN product façade.**
 
 | | ESN | WTF |
 |---|-----|-----|
-| Loop | Stream step ↔ one train row | Per-sample **episode** → **one** feature row (end state) |
-| Input | Low-dim channels, block broadcast | Length-N **field** each pass |
+| Loop | Stream step ↔ one train row | Per-sample **episode** → **one** end feature row |
+| Input | Low-dim channels, block broadcast | Length-N **field** every pass |
 | Time | Stream time | Synthetic orbit inside one sample |
-| Product | Stream RC | Field orbit on fixed weights |
-
-External feedback is **not** used and **not** ported for the orbit.
+| Feedback | Optional external feedback port | **None — do not port** |
 
 ### Dependency model (locked)
 
-Do **not** link ESN or HCNN as libraries. Vendor local copies:
+Do **not** link ESN or HCNN as libraries.
 
-| Piece | From |
-|-------|------|
-| `Reservoir`, `Readout` | **HypercubeESN** (pin commit/tag) |
-| `third_party/HypercubeCNN` | **HypercubeCNN** upstream (pin commit/tag) — **not** via hESN’s tree |
+| Piece | From | Notes |
+|-------|------|-------|
+| Reservoir | **HypercubeESN** as a **starting copy** | Fork into a **WTF-specific** reservoir: keep cube dynamics, delay line, `W_in` gather, SR/leak. **Drop** stream-era baggage we do not need (`num_inputs` block inject, **entire external-feedback path**, ESN lifecycle hooks). First-class **length-N field inject**. Own delay-line layout so IC load is correct (§4.3). |
+| Readout | **HypercubeESN** starting copy | Thin HCNN façade; adapt to end-of-episode packing |
+| `third_party/HypercubeCNN` | **HypercubeCNN** upstream | Independent vendor; **not** via hESN’s tree |
 
-Pin sources in `VENDORED.md`. Re-sync when upstream fixes matter.
+**Source trees (locked for first copy):** use what’s on disk at Phase 1 — not
+“latest main” as a slogan.
+
+| Source | Branch | Commit (on disk at lock) |
+|--------|--------|---------------------------|
+| HypercubeESN | **`feedback`** (**not** `main`) | `ae3fb6430e557066a25d7678fdbfedad81093697` |
+| HypercubeCNN | `main` | `20bbb23476342abfd957fdc0fabe88e4dad7ae00` |
+
+Record the same in `VENDORED.md` when the files are copied. Re-sync later only
+when useful — this is not “stay API-compatible with ESN forever.”
+
+**External feedback:** not used, **not ported**, no stubs that invite misuse.
+No feedback port.
 
 ---
 
 ## 4. Locked design
 
-### 4.1 Field contract (S0)
+### 4.1 Field contract
 
 | Rule | Behavior |
 |------|----------|
@@ -111,104 +124,101 @@ Pin sources in `VENDORED.md`. Re-sync when upstream fixes matter.
 | Packing | Caller-owned (typical: data in low addresses, zeros above) |
 | Mutation | Do not modify caller’s `x` |
 
-### 4.2 Affine field translation (S1) + input path (Q2)
+### 4.2 Affine field translation + input path
 
 **Fixed:** cube geometry and all reservoir weights.  
 **Moving:** registration of `x` only.
 
 ```
-// each pass
+// each pass; c may be >= N — mask wraps the field orbit
 for v in 0 .. N-1:
     vtx_input[v] = x[(v XOR c) & (N - 1)]
-Step()    // stock: s += sum_i vtx_input[v XOR (1<<i)] * W_in[v][i] + recurrent
+Step()    // field is vtx_input; s += sum_i vtx_input[v XOR e_i] * W_in[v][i] + recurrent
 c += 1
 ```
 
-- Drive **is** `vtx_input`. Input path is stock hESN neighbor gather (`W_in` is
-  `N × dim` — not “one weight per vertex”).
-- Add length-N field inject on vendored Reservoir (`InjectInputField` or
-  equivalent). Avoid `num_inputs = N` scalar hacks.
-- Address period is **N** (mask with `N - 1` when `c` can exceed).
-- Between samples: reload **s0** (not zero-clear) + `c = 0` (§4.3).
+- Drive **is** `vtx_input`. Input path is neighbor gather on that field
+  (`W_in` is `N × dim`).
+- Field inject is the native drive API — not channel/block hacks from ESN.
+- Field alignment is **period N**. **`T` may exceed `N`**; `(v XOR c) & (N - 1)`
+  wraps so the orbit continues without a separate wrap counter.
 
-### 4.2a Episode initial state (**s0**, locked)
+**Out of scope**
 
-Do **not** start each episode from an all-zero reservoir. At construction, draw
-a frozen IC buffer **s0** sized to the **full delay line** and keep it for the
-life of the instance:
+- Reindexing weights by `c` (map-side XOR).
+- Diagonal-only input (no `W_in` gather).
+- Extra length-N field-gain on top of `W_in` (unless named later).
+- **Any external-feedback / closed-loop port.**
+
+### 4.3 Episode initial state (**s0**)
+
+Do **not** start each episode from all zeros.
 
 | Rule | Behavior |
 |------|----------|
-| Size | **`N × M`** with `M = history_depth` (one length-N slice per age) |
+| Size | **`N × M`** (`M = history_depth`) — full delay-line worth of IC |
 | When drawn | Construction only |
-| Seed | **Same as the reservoir seed** (no separate IC seed knob in v1) |
+| Seed | **Separate IC seed** (`ic_seed` / `s0_seed`) — not the reservoir weight seed |
 | Distribution | i.i.d. uniform on **[-0.5, 0.5]** over the whole buffer |
-| Lifetime | **Static** after construction — never trained, never redrawn per sample |
-| Each episode start | **`memcpy`** the full **`N × M`** buffer into delay-line storage (and align current state / age-0 with that load) — **not** zeros, **not** residual state from the previous sample |
-| `c` | Reset to `0` |
+| Lifetime | **Static** after construction |
+| Each episode | Reload **s0** into the live delay line / state so the first `Step` sees that IC as logical ages — **not** residual state from the previous sample |
+| `c` | `0` |
 
-Implementation intent: one bulk copy of frozen `s0` into the contiguous
-history block (same layout as hESN’s `N * history_depth` buffer), not a
-per-vertex loop. Same **s0** every episode → no sample-order leakage;
-full-depth nonzero start → recurrent gather does not see a zero-padded history
-at episode 0.
+**Load must respect delay-line logic.** A blind `memcpy` into a mid-rotation
+ring buffer (ESN-style rotating slice pointers) can scramble logical ages.
+WTF owns the layout: either reset age base / rotation to a canonical position
+then bulk-load `s0` in age order, or scatter-load by logical age. Prefer a
+layout where episode start is **correct and simple** (canonical rest + bulk
+copy of `N × M` is fine **after** rotation state is reset). Do not cargo-cult
+a one-liner that ignores ring orientation.
 
-**Out of scope for v1 product**
-
-- Reindexing weights by `c` (map-side XOR).
-- Diagonal-only input (`s += W[v] * x[v XOR c]` without gather).
-- Extra length-N field-gain on top of `W_in` (optional later only if named).
-
-### 4.3 Episode + readout sample (locked recipe)
-
-**`T` is drive passes only.** The readout does not run during the loop. After
-`T` steps, sample the reservoir **once** (optional end delay-line pack `B`) for
-the HCNN. Washout of **s0** is just the early part of those same `T` orbit
-passes — no separate warmup counter.
+### 4.4 Episode recipe
 
 ```
-LoadDelayLine(s0)      // full N×M buffer; not zero Clear
+LoadIC(s0)                 // correct full-depth IC; see §4.3
 c = 0
-for t = 0 .. T-1:                          // drive only
-    stage vtx_input[v] = x[(v XOR c) & (N - 1)]
-    Step(); c += 1
+for pass = 0 .. T-1:       // drive only
+    for v in 0 .. N-1:
+        vtx_input[v] = x[(v XOR c) & (N - 1)]
+    Step()
+    c += 1
 // once, after the loop:
-features = pack SliceAt(0 .. B-1)           // B=1 → newest slice only
-// one training / predict row for this sample
+features = pack end ages 0 .. B-1     // default B = 1
 ```
 
-| Knob | v1 |
-|------|-----|
-| Episode start | Reload frozen **s0** (`N × M` delay line); `c = 0` |
-| `T` | Drive-pass count (orbit depth); open: how it scales with N |
-| Readout | **Once after** the `T` drive passes — not interleaved |
-| `B` | Multi-slice from **end** delay line only |
-| Ext-fb | Off |
+| Knob | v1 default |
+|------|------------|
+| Episode start | Load **s0**; `c = 0` |
+| **T** | **`N`** (allowed to be set **> N**; field index wraps via mask) |
+| Readout | **Once after** all `T` drive passes |
+| **B** | **`1`** (newest slice only; config may raise later, power of two) |
+| Ext-fb | **Does not exist** |
 
-### 4.4 Decisions table
+### 4.5 Decisions table
 
 | Topic | Decision | Date |
 |-------|----------|------|
 | Name | HypercubeWTF | 2026-08-04 |
-| S1 | `vtx_input[v] = x[v XOR c]`; weights fixed | 2026-08-04 |
-| Input path | Stock `W_in` gather; drive = `vtx_input` | 2026-08-04 |
+| S1 | `vtx_input[v] = x[(v XOR c) & (N-1)]`; weights fixed | 2026-08-04 |
+| Input path | Field inject + stock-style `W_in` gather | 2026-08-04 |
 | Map-side XOR | Out of scope | 2026-08-04 |
 | Field contract | size==N or throw; trust [-1,1]; packing caller-owned | 2026-08-04 |
-| Dependencies | Vendor Reservoir+Readout from hESN; HCNN from HypercubeCNN upstream | 2026-08-04 |
-| Wrap full ESN | No | 2026-08-04 |
-| Readout sample (Q5) | **Once per episode at end** (optional end-only B-slices) | 2026-08-04 |
-| Episode IC (**s0**) | Frozen U[-0.5, 0.5]^(N×M) from **reservoir seed**; `memcpy` full delay line every episode | 2026-08-04 |
+| Dependencies | Start-from hESN Reservoir/Readout + HCNN upstream; **WTF-specific** fork (drop ESN stream/fb baggage) | 2026-08-04 |
+| First copy sources | hESN **`feedback`** @ `ae3fb64…`; HCNN `main` @ `20bbb23…` (on-disk lock) | 2026-08-04 |
+| External feedback | **No port. No port. No port.** | 2026-08-04 |
+| Readout sample | Once per episode at end | 2026-08-04 |
+| **B** default | **1** | 2026-08-04 |
+| **T** default | **N**; `T > N` allowed (wrap field index) | 2026-08-04 |
+| **s0** | Frozen U[-0.5,0.5]^(N×M); **separate IC seed**; intelligent full-depth load each episode | 2026-08-04 |
 
 ---
 
 ## 5. Open questions
 
-| ID | Question | Lean |
-|----|----------|------|
-| Q6 | How episode drive count `T` scales with N | open |
+| ID | Question | Notes |
+|----|----------|-------|
 | Q8 | First demo | synthetic first; Raman only with clear data protocol |
-| — | Vendoring pins (ESN + HCNN commits) | required before Phase 1 |
-| — | Default `B` (1 vs multi-slice at end) | open; ESN-style knob |
+| — | Train collect / batch API shape | revisit later (`RunEpisode` + collect vs other) |
 
 ---
 
@@ -217,18 +227,20 @@ features = pack SliceAt(0 .. B-1)           // B=1 → newest slice only
 ```text
 WTFConfig
   reservoir: ReservoirConfig   // dim, seed, SR, leak, history_depth, input_scaling, …
+  ic_seed:   uint64_t          // separate from reservoir weight seed
   readout:   ReadoutConfig
-  episode:   EpisodeConfig     // T
-  readout_slices: size_t B     // end-of-episode delay-line pack only
+  episode_T: size_t            // default N
+  readout_slices: size_t B     // default 1; end-of-episode pack only
 
 class WTF
   explicit WTF(const WTFConfig&);
   void RunEpisode(span<const float> x);   // throws if x.size() != N
-  void TrainOnCollected(...);
+  // train / predict surface — revisit later
   vector<float> Predict(span<const float> x);
 ```
 
-**v1 non-goals:** closed-loop free-run; replacing ESN for real streams.
+**v1 non-goals:** closed-loop free-run; replacing ESN for real streams; Python
+bindings; any external-feedback API.
 
 ---
 
@@ -240,66 +252,53 @@ HypercubeWTF/
   LICENSE
   README.md
   docs/project.md
-  WTF.h / Reservoir.* / Readout.*   // flat core (ESN-style); Reservoir+Readout from hESN
-  third_party/HypercubeCNN/         // from HypercubeCNN upstream
+  WTF.h
+  Reservoir.* / Readout.*     // WTF fork (started from hESN sources)
+  third_party/HypercubeCNN/   // from HypercubeCNN upstream
   examples/
   tests/
 ```
 
 ---
 
-## 8. Validation
-
-**Smoke:** fixed seed → bit-stable end features; reloading **s0** isolates
-samples (order shuffle does not change per-sample features); `x.size() != N`
-throws; train/predict parity after readout state get/set.
-
-**Examples (when ready):** synthetic classification in R^N; optional spectral
-toy with caller packing.
-
----
-
-## 9. Workplan
+## 8. Workplan
 
 Sequential gates. Docs may draft ahead; code waits on exit criteria.
 
 | Phase | Work | Exit |
 |-------|------|------|
-| **0** Charter | This file; design lock | Pins chosen; optional B default |
-| **1** Skeleton | CMake C++23; vendor HCNN + Reservoir/Readout; empty `WTF`; README | Release build |
-| **2** Episode core | Field inject; field orbit; end sample; tests | Stable end features from synthetic `x` |
-| **3** Readout | End pack (B); batch train; predict; metrics | E2E synthetic classification |
+| **0** Charter | This file; design lock | Source trees recorded (§3) |
+| **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | Release build |
+| **2** Episode core | Field inject; orbit; IC load; end sample; tests | Stable end features from synthetic `x` |
+| **3** Readout | End pack (B); train/predict path | E2E synthetic classification |
 | **4** Demos | Example packing helpers; spectral toy; optional real data | Example binary + short doc |
-| **5** Polish | Bindings / perf / richer packing as needed | — |
+| **5** Polish | C++ perf, docs, richer example packing as needed | Solid C++ core |
+
+**Python SDK / bindings:** not in this workplan. Only after the C++ core is
+solid. Do not scaffold Python early.
 
 ---
 
-## 10. References
+## 9. References
 
 | Doc | Use |
 |-----|-----|
-| `HypercubeESN/docs/Reservoir.md` | Dynamics, inject, history |
-| `HypercubeESN/docs/Readout.md` | HCNN head, multi-slice |
+| `HypercubeESN/docs/Reservoir.md` | Starting physics (cube, gather, history) — not binding API |
+| `HypercubeESN/docs/Readout.md` | HCNN head / multi-slice ideas |
 
 ---
 
-## 11. Next
+## 10. Next
 
-1. Pin HypercubeESN + HypercubeCNN commits for vendoring.
-2. Default **B** (1 vs multi-slice at end) if not deferred to config default.
-3. Choose first demo (**Q8**); lean on episode length **T** (**Q6**).
-4. Phase 1 skeleton.
+1. Choose first demo (**Q8**), or defer and start Phase 1.
+2. Phase 1 skeleton: copy from hESN **`feedback`** + HCNN `main` (commits in §3); WTF Reservoir fork (no feedback port).
 
 ---
 
-## 12. Changelog
+## 11. Changelog
 
 | Date | Change |
 |------|--------|
-| 2026-08-04 | Charter: goal, vendor-copy deps, S1 field orbit, workplan |
-| 2026-08-04 | Locked: S1 = stage `x[v XOR c]` + stock `W_in`; S0 = length-N caller field; HCNN from upstream not via hESN |
-| 2026-08-04 | Audit: cut fluff, closed debate residue, single locked-design section |
-| 2026-08-04 | **Q5 locked:** readout samples reservoir **once at episode end** (optional end-only B); no multi-phase collect |
-| 2026-08-04 | Removed bake-off / constant-drive control from charter, validation, and workplan |
-| 2026-08-04 | Drop T_warmup: `T` is drive passes only; washout is implicit in the orbit |
-| 2026-08-04 | Episode IC: frozen **s0** length **N×M** ~ U[-0.5,0.5]; reload full delay line each episode (not zero Clear) |
+| 2026-08-04 | Charter established; S1 field orbit; vendor model; end-only readout; no bake-off |
+| 2026-08-04 | Defaults **B=1**, **T=N**; `T>N` wraps; separate **ic_seed**; intelligent **s0** load; WTF Reservoir fork (no ESN fb / stream baggage); end-state wording clarified |
+| 2026-08-04 | First copy: HypercubeESN **`feedback`** (not main) @ ae3fb64…; HypercubeCNN main @ 20bbb23… |
