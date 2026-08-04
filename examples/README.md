@@ -2,6 +2,18 @@
 
 Phase 4 demos. Packing is **example-owned** (not core API).
 
+## Layout
+
+```text
+examples/
+  README.md
+  common/           # shared helpers (e.g. pack_field.h)
+  synth/            # wtf_synth — synthetic multi-class fields
+  mnist/            # wtf_mnist — MNIST DualPlane / PadLow
+```
+
+Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.txt`.
+
 ## Packing rules (v1)
 
 | Packer | Use | Layout |
@@ -13,18 +25,16 @@ Phase 4 demos. Packing is **example-owned** (not core API).
 
 ## Binaries
 
-| Target | Role | Data |
-|--------|------|------|
-| `wtf_synth` | Synthetic multi-class fields → episode → train → test | None (CI-friendly) |
-| `wtf_mnist` | MNIST pack → episode → train → test | **`data/` in this repo only** |
+| Target | Folder | Data |
+|--------|--------|------|
+| `wtf_synth` | `examples/synth/` | None (CI-friendly) |
+| `wtf_mnist` | `examples/mnist/` | **`data/` at repo root only** |
 
-Edit knobs in each file’s `DemoConfig`.
+Edit knobs in each demo’s `DemoConfig`.
 
 ### MNIST data
 
-Always `HypercubeWTF/data/` (path next to `examples/`). No env override, no other project.
-
-Uncompressed IDX (not in git):
+Always `HypercubeWTF/data/` (repo root). No env override, no other project.
 
 ```text
 data/train-images-idx3-ubyte
@@ -33,9 +43,7 @@ data/t10k-images-idx3-ubyte
 data/t10k-labels-idx1-ubyte
 ```
 
-See [`data/README.md`](../data/README.md) for download steps.
-
-Default demo uses a **subset** (see `DemoConfig::max_train` / `max_test`), dim 10, DualPlane. Raise those knobs for longer campaigns.
+See [`data/README.md`](../data/README.md).
 
 ### Product note
 

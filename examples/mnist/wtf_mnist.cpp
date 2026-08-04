@@ -79,10 +79,12 @@ WTFConfig MakeWtfConfig(const DemoConfig& d)
     return cfg;
 }
 
-/// Always this repository's data/ (sibling of examples/), never another project.
+/// This repository's data/ only (examples/mnist/ → repo root → data/).
 std::filesystem::path ResolveDataDir()
 {
-    return std::filesystem::path(__FILE__).parent_path().parent_path() / "data";
+    // __FILE__ = .../examples/mnist/wtf_mnist.cpp
+    return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
+           / "data";
 }
 
 void PackSample(const DemoConfig& d, const wtf_ex::MnistSample& s,

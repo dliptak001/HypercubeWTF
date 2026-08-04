@@ -37,12 +37,16 @@ if(MINGW)
 endif()
 
 # ——— Smoke + Phase 4 demos (top-level project only) ———
+# Layout: examples/<demo>/…  shared headers: examples/common/
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    function(wtf_add_exe name src)
-        add_executable(${name} ${src})
+    function(wtf_add_exe name)
+        cmake_parse_arguments(WTF_EX "" "" "SOURCES;INCLUDES" ${ARGN})
+        add_executable(${name} ${WTF_EX_SOURCES})
         target_link_libraries(${name} PRIVATE HypercubeWTFCore)
         target_include_directories(${name} PRIVATE
-            ${PROJECT_SOURCE_DIR}/examples)
+            ${PROJECT_SOURCE_DIR}/examples/common
+            ${WTF_EX_INCLUDES}
+        )
         target_compile_options(${name} PRIVATE
             $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
             $<$<CONFIG:Debug>:-O0 -g>
@@ -55,7 +59,9 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
         endif()
     endfunction()
 
-    wtf_add_exe(wtf_smoke tests/wtf_smoke.cpp)
-    wtf_add_exe(wtf_synth examples/wtf_synth.cpp)
-    wtf_add_exe(wtf_mnist examples/wtf_mnist.cpp)
+    wtf_add_exe(wtf_smoke SOURCES tests/wtf_smoke.cpp)
+    wtf_add_exe(wtf_synth SOURCES examples/synth/wtf_synth.cpp)
+    wtf_add_exe(wtf_mnist
+        SOURCES examples/mnist/wtf_mnist.cpp
+        INCLUDES ${PROJECT_SOURCE_DIR}/examples/mnist)
 endif()

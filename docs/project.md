@@ -255,7 +255,7 @@ HypercubeWTF/
   WTF.h
   Reservoir.* / Readout.*     // WTF fork (started from hESN sources)
   third_party/HypercubeCNN/   // from HypercubeCNN upstream
-  examples/
+  examples/                 // one folder per demo + common/
   tests/
 ```
 
