@@ -12,6 +12,7 @@
 #include "find_data_dir.h"
 #include "mnist_idx.h"
 #include "pack_field.h"
+#include "print_config.h"
 
 #include <chrono>
 #include <cstdio>
@@ -43,7 +44,7 @@ static WTFConfig MakeWTFConfig()
     cfg.reservoir.dim           = 10; // N = 1024; DualPlane S≈22; PadLow needs dim >= 10
     cfg.reservoir.history_depth = 8;
     cfg.reservoir.seed          = 1;
-    cfg.reservoir.spectral_radius = 0.99;
+    cfg.reservoir.spectral_radius = 0.999;
     cfg.reservoir.input_scaling = 0.015;
     cfg.reservoir.verbose       = false;
 
@@ -51,7 +52,7 @@ static WTFConfig MakeWTFConfig()
     cfg.ic_seed = 2;
 
     // Episode: T = 0 means default T = N
-    cfg.episode.T              = 0;
+    cfg.episode.T              = 128;
     cfg.episode.readout_slices = 1;
 
     // Readout (trainable HCNN)
@@ -67,6 +68,7 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.seed                    = 42;
     cfg.readout.num_threads             = 0; // 0 = HCNN auto
     cfg.readout.restore_best_epoch      = true;
+    cfg.readout.momentum                = 0.9f;
     cfg.readout.best_epoch_holdout_frac = 0.1f; // tail of collected buffer only
 
     return cfg;
@@ -141,6 +143,7 @@ int main(int argc, char** argv)
             (data_dir / "t10k-labels-idx1-ubyte").string(), kMaxTest);
 
         WTF wtf(cfg);
+        wtf_ex::PrintWtfHeader("wtf_mnist", wtf, cfg);
         std::vector<float> field(wtf.N());
 
         // One DualPlane embedder for the whole run (not per sample).
@@ -152,9 +155,8 @@ int main(int argc, char** argv)
             dual_emb ? &*dual_emb : nullptr;
 
         const char* pack_name = (kPack == PackMode::DualPlane) ? "DualPlane" : "PadLow";
-        std::printf("wtf_mnist: pack=%s N=%zu T=%zu train=%zu test=%zu epochs=%d\n",
-                    pack_name, wtf.N(), wtf.T(), train.size(), test.size(),
-                    cfg.readout.epochs);
+        std::printf("wtf_mnist: pack=%s train=%zu test=%zu epochs=%d\n",
+                    pack_name, train.size(), test.size(), cfg.readout.epochs);
         if (dual_emb)
         {
             const auto plan = dual_emb->plan(kImgSide, kImgSide);

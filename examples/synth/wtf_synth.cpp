@@ -3,6 +3,7 @@
 /// CI-friendly (no data files). Edit knobs in the sections below.
 
 #include "WTF.h"
+#include "print_config.h"
 
 #include <chrono>
 #include <cmath>
@@ -143,9 +144,9 @@ int main()
             throw std::logic_error("readout.num_outputs must match kNumClasses");
 
         WTF wtf(cfg);
-
-        std::printf("wtf_synth: N=%zu T=%zu B=%zu classes=%d train=%d/class noise=%.2f\n",
-                    wtf.N(), wtf.T(), wtf.B(), kNumClasses, kTrainPerClass, kNoiseStd);
+        wtf_ex::PrintWtfHeader("wtf_synth", wtf, cfg);
+        std::printf("wtf_synth: classes=%d train=%d/class noise=%.2f\n",
+                    kNumClasses, kTrainPerClass, kNoiseStd);
 
         auto t0 = std::chrono::steady_clock::now();
         for (int c = 0; c < kNumClasses; ++c)
