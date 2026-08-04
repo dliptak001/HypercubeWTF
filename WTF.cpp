@@ -97,39 +97,27 @@ void WTF::RunEpisode(std::span<const float> x)
 void WTF::ClearCollected()
 {
     collected_features_.clear();
+    collected_labels_.clear();
     collected_targets_.clear();
     num_collected_ = 0;
 }
 
-void WTF::RequireTargetSize(std::span<const float> target) const
+void WTF::RequireClassification() const
 {
-    const size_t need = (readout_cfg_.task == ReadoutTask::Classification)
-                            ? 1u
-                            : static_cast<size_t>(readout_cfg_.num_outputs);
-    if (target.size() != need)
+    if (readout_cfg_.task != ReadoutTask::Classification)
         throw std::invalid_argument(
-            "WTF::CollectEpisode: target size does not match task "
-            "(classification: 1 class index; regression: num_outputs)");
-
-    // Classification: reject non-integral or out-of-range class indices before
-    // they become silent static_cast<int> mistakes inside HCNN training.
-    if (readout_cfg_.task == ReadoutTask::Classification)
-    {
-        const float y = target[0];
-        const int cls = static_cast<int>(y);
-        if (y != static_cast<float>(cls) || cls < 0
-            || cls >= readout_cfg_.num_outputs)
-        {
-            throw std::invalid_argument(
-                "WTF::CollectEpisode: class index must be an integer in "
-                "[0, num_outputs)");
-        }
-    }
+            "WTF: classification API used but task is Regression");
 }
 
-void WTF::CollectEpisode(std::span<const float> x, std::span<const float> target)
+void WTF::RequireRegression() const
 {
-    RequireTargetSize(target);
+    if (readout_cfg_.task != ReadoutTask::Regression)
+        throw std::invalid_argument(
+            "WTF: regression API used but task is Classification");
+}
+
+void WTF::AppendFeatures(std::span<const float> x)
+{
     RunEpisode(x);
 
     const size_t f = FeatureSize();
@@ -137,17 +125,42 @@ void WTF::CollectEpisode(std::span<const float> x, std::span<const float> target
     collected_features_.resize(off + f);
     std::memcpy(collected_features_.data() + off, last_features_.data(),
                 f * sizeof(float));
-
-    collected_targets_.insert(collected_targets_.end(), target.begin(), target.end());
     ++num_collected_;
+}
+
+void WTF::CollectEpisode(std::span<const float> x, int class_label)
+{
+    RequireClassification();
+    if (class_label < 0 || class_label >= readout_cfg_.num_outputs)
+        throw std::invalid_argument(
+            "WTF::CollectEpisode: class_label must be in [0, num_outputs)");
+
+    AppendFeatures(x);
+    collected_labels_.push_back(class_label);
+}
+
+void WTF::CollectEpisode(std::span<const float> x, std::span<const float> target)
+{
+    RequireRegression();
+    if (target.size() != static_cast<size_t>(readout_cfg_.num_outputs))
+        throw std::invalid_argument(
+            "WTF::CollectEpisode: target size must equal num_outputs");
+
+    AppendFeatures(x);
+    collected_targets_.insert(collected_targets_.end(), target.begin(), target.end());
 }
 
 void WTF::TrainOnCollected()
 {
     if (num_collected_ == 0)
         throw std::invalid_argument("WTF::TrainOnCollected: no samples collected");
-    readout_->Train(collected_features_.data(), collected_targets_.data(),
-                    num_collected_);
+
+    if (readout_cfg_.task == ReadoutTask::Classification)
+        readout_->Train(collected_features_.data(), collected_labels_.data(),
+                        num_collected_);
+    else
+        readout_->Train(collected_features_.data(), collected_targets_.data(),
+                        num_collected_);
 }
 
 std::vector<float> WTF::Predict(std::span<const float> x)
@@ -172,7 +185,7 @@ double WTF::AccuracyOnCollected() const
         throw std::invalid_argument("WTF::AccuracyOnCollected: no samples");
     if (readout_cfg_.task != ReadoutTask::Classification)
         throw std::invalid_argument("WTF::AccuracyOnCollected: not classification");
-    return readout_->Accuracy(collected_features_.data(), collected_targets_.data(),
+    return readout_->Accuracy(collected_features_.data(), collected_labels_.data(),
                               num_collected_);
 }
 

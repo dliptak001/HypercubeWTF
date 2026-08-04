@@ -65,9 +65,12 @@ public:
     /// Drop all samples collected for batch training.
     void ClearCollected();
 
-    /// @ref RunEpisode then append features + targets to the collect buffer.
-    /// Classification: @p target is one float class index.
-    /// Regression: @p target is NumOutputs() floats.
+    /// @ref RunEpisode then append features + class label (classification task).
+    /// @p class_label must be in [0, NumOutputs()).
+    void CollectEpisode(std::span<const float> x, int class_label);
+
+    /// @ref RunEpisode then append features + regression targets.
+    /// @p target must have length NumOutputs().
     void CollectEpisode(std::span<const float> x, std::span<const float> target);
 
     /// Batch-train the HCNN on all collected episodes (requires NumCollected() > 0).
@@ -87,7 +90,9 @@ public:
 
 private:
     void PackEndFeatures();
-    void RequireTargetSize(std::span<const float> target) const;
+    void AppendFeatures(std::span<const float> x);
+    void RequireClassification() const;
+    void RequireRegression() const;
 
     size_t n_ = 0;
     size_t M_ = 0;
@@ -104,6 +109,7 @@ private:
     std::vector<float> last_features_;
 
     std::vector<float> collected_features_; // num_collected_ * FeatureSize()
-    std::vector<float> collected_targets_;  // task-dependent layout
+    std::vector<int> collected_labels_;     // classification: one int per episode
+    std::vector<float> collected_targets_;  // regression: NumOutputs() floats each
     size_t num_collected_ = 0;
 };

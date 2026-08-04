@@ -215,13 +215,11 @@ int main()
                 auto x0 = MakeField(wtf.N(), 0);
                 // Mild per-sample jitter so we are not memorizing one vector.
                 x0[rep % (wtf.N() / 2)] += 0.01f * static_cast<float>(rep);
-                float t0 = 0.0f;
-                wtf.CollectEpisode(x0, std::span<const float>(&t0, 1));
+                wtf.CollectEpisode(x0, /*class_label=*/0);
 
                 auto x1 = MakeField(wtf.N(), 1);
                 x1[rep % (wtf.N() / 2)] -= 0.01f * static_cast<float>(rep);
-                float t1 = 1.0f;
-                wtf.CollectEpisode(x1, std::span<const float>(&t1, 1));
+                wtf.CollectEpisode(x1, /*class_label=*/1);
             }
 
             if (wtf.NumCollected() != static_cast<size_t>(2 * kPerClass))
@@ -230,13 +228,11 @@ int main()
                 return 1;
             }
 
-            // Out-of-range class index must fail at collect (product boundary).
+            // Out-of-range class index must fail at collect.
             {
                 auto x = MakeField(wtf.N(), 0);
-                float bad = 2.0f; // num_outputs = 2 → valid 0,1
-                if (!ExpectThrow("class index OOR", [&] {
-                        wtf.CollectEpisode(x, std::span<const float>(&bad, 1));
-                    }))
+                if (!ExpectThrow("class index OOR",
+                                 [&] { wtf.CollectEpisode(x, 2); }))
                     return 1;
             }
 
