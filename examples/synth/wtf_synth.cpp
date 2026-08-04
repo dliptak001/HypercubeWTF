@@ -3,12 +3,14 @@
 /// CI-friendly (no data files). Edit knobs in the sections below.
 
 #include "WTF.h"
+#include "done_beep.h"
 #include "print_config.h"
 
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
@@ -137,6 +139,7 @@ static std::vector<float> MakePattern(size_t n, int label, int rep)
 
 int main()
 {
+    int exit_code = 1;
     try
     {
         const WTFConfig cfg = MakeWTFConfig();
@@ -149,14 +152,22 @@ int main()
                     kNumClasses, kTrainPerClass, kNoiseStd);
 
         auto t0 = std::chrono::steady_clock::now();
-        for (int c = 0; c < kNumClasses; ++c)
+        const size_t n_train =
+            static_cast<size_t>(kNumClasses) * static_cast<size_t>(kTrainPerClass);
+        std::vector<int> train_labels(n_train);
+        for (size_t i = 0; i < n_train; ++i)
         {
-            for (int r = 0; r < kTrainPerClass; ++r)
-            {
-                auto x = MakePattern(wtf.N(), c, r);
-                wtf.CollectEpisode(x, c);
-            }
+            const int c = static_cast<int>(i / static_cast<size_t>(kTrainPerClass));
+            train_labels[i] = c;
         }
+        wtf.CollectEpisodes(
+            n_train, train_labels,
+            [&](size_t i, std::span<float> out_field) {
+                const int c = static_cast<int>(i / static_cast<size_t>(kTrainPerClass));
+                const int r = static_cast<int>(i % static_cast<size_t>(kTrainPerClass));
+                auto x = MakePattern(wtf.N(), c, r);
+                std::memcpy(out_field.data(), x.data(), x.size() * sizeof(float));
+            });
         wtf.TrainOnCollected();
         // Full collected buffer (no holdout in this demo) — not a separate test set.
         const double acc_on_collected = wtf.AccuracyOnCollected();
@@ -188,13 +199,16 @@ int main()
         {
             std::fprintf(stderr, "wtf_synth: test accuracy too low (need >= %.2f)\n",
                          kMinTestAcc);
-            return 1;
         }
-        return 0;
+        else
+        {
+            exit_code = 0;
+        }
     }
     catch (const std::exception& e)
     {
         std::fprintf(stderr, "wtf_synth: %s\n", e.what());
-        return 1;
     }
+    wtf_ex::DoneBeep();
+    return exit_code;
 }

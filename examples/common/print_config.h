@@ -32,9 +32,11 @@ inline void PrintReservoirConfig(const ReservoirConfig& r,
 inline void PrintWtfHeader(const char* demo_name, const WTF& wtf,
                            const WTFConfig& cfg)
 {
-    std::printf("%s: N=%zu T=%zu B=%zu M=%zu ic_seed=%llu\n",
+    std::printf("%s: N=%zu T=%zu B=%zu M=%zu ic_seed=%llu collect_threads=%zu%s\n",
                 demo_name, wtf.N(), wtf.T(), wtf.B(), wtf.M(),
-                static_cast<unsigned long long>(cfg.ic_seed));
+                static_cast<unsigned long long>(cfg.ic_seed),
+                cfg.episode.collect_threads,
+                cfg.episode.collect_threads == 0 ? " (auto)" : "");
     PrintReservoirConfig(cfg.reservoir, wtf.reservoir().GetRealizedSpectralRadius());
     std::fflush(stdout);
 }

@@ -261,6 +261,89 @@ int main()
                         acc, wtf.N(), wtf.T());
         }
 
+        // ----- Parallel CollectEpisodes: same frozen weights → same features -----
+        {
+            auto cfg = MakeCfg();
+            cfg.readout.epochs = 60;
+            cfg.readout.num_threads = 1;
+
+            constexpr int kPerClass = 12;
+            std::vector<float> fields;
+            std::vector<int> labels;
+            {
+                WTF sizing(cfg);
+                fields.reserve(static_cast<size_t>(2 * kPerClass) * sizing.N());
+            }
+            for (int rep = 0; rep < kPerClass; ++rep)
+            {
+                auto x0 = MakeField(1u << 5, 0); // N=32 from MakeCfg dim=5
+                // Rebuild with live N after we know it — use fixed N=32.
+                x0 = MakeField(32, 0);
+                x0[static_cast<size_t>(rep) % 16] += 0.01f * static_cast<float>(rep);
+                fields.insert(fields.end(), x0.begin(), x0.end());
+                labels.push_back(0);
+
+                auto x1 = MakeField(32, 1);
+                x1[static_cast<size_t>(rep) % 16] -= 0.01f * static_cast<float>(rep);
+                fields.insert(fields.end(), x1.begin(), x1.end());
+                labels.push_back(1);
+            }
+
+            cfg.episode.collect_threads = 1;
+            WTF serial(cfg);
+            for (size_t i = 0; i < labels.size(); ++i)
+            {
+                std::span<const float> x(fields.data() + i * serial.N(), serial.N());
+                serial.CollectEpisode(x, labels[i]);
+            }
+
+            cfg.episode.collect_threads = 4;
+            WTF parallel(cfg);
+            parallel.CollectEpisodes(fields, labels);
+
+            if (parallel.NumCollected() != serial.NumCollected()
+                || parallel.NumCollected() != labels.size())
+            {
+                std::fprintf(stderr, "parallel collect count mismatch\n");
+                return 1;
+            }
+
+            // Feature parity: episode on primary must match bulk-worker episode
+            // for the same field (identical weight seed + s0).
+            {
+                const float* x = fields.data();
+                serial.RunEpisode(std::span<const float>(x, serial.N()));
+                parallel.RunEpisode(std::span<const float>(x, parallel.N()));
+                if (!Near(serial.LastFeatures(), parallel.LastFeatures()))
+                {
+                    std::fprintf(stderr,
+                                 "parallel: primary reservoirs diverged (seed?)\n");
+                    return 1;
+                }
+            }
+
+            serial.TrainOnCollected();
+            parallel.TrainOnCollected();
+            const double acc_s = serial.AccuracyOnCollected();
+            const double acc_p = parallel.AccuracyOnCollected();
+            // Identical features + deterministic single-thread HCNN → same acc.
+            if (std::fabs(acc_s - acc_p) > 1e-12)
+            {
+                std::fprintf(stderr,
+                             "parallel collect feature/train mismatch: "
+                             "serial=%.6f parallel=%.6f\n",
+                             acc_s, acc_p);
+                return 1;
+            }
+            if (acc_p < 0.85)
+            {
+                std::fprintf(stderr, "parallel collect train acc low: %.3f\n", acc_p);
+                return 1;
+            }
+
+            std::printf("wtf_smoke: ok parallel collect acc=%.3f\n", acc_p);
+        }
+
         return 0;
     }
     catch (const std::exception& e)
