@@ -53,16 +53,16 @@ static WTFConfig MakeWTFConfig()
 
     // Episode: T = 0 means default T = N
     cfg.episode.T              = 128;
-    cfg.episode.readout_slices = 2;
+    cfg.episode.readout_slices = 1;
 
     // Readout (trainable HCNN)
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
     cfg.readout.num_layers              = 1;
     cfg.readout.use_pooling             = true;
-    cfg.readout.conv_channels            = 8;
+    cfg.readout.conv_channels           = 16;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.activation              = ReadoutActivation::TANH;
+    cfg.readout.activation              = ReadoutActivation::NONE;
     cfg.readout.epochs                  = 40;
     cfg.readout.batch_size              = 32;
     cfg.readout.seed                    = 42;
@@ -79,7 +79,7 @@ static WTFConfig MakeWTFConfig()
 // =============================================================================
 
 static constexpr PackMode kPack       = PackMode::DualPlane;
-static constexpr size_t kMaxTrain     = 2000; // short default; campaign: 20000 / 0=all
+static constexpr size_t kMaxTrain     = 20000; // short default; campaign: 20000 / 0=all
 static constexpr size_t kMaxTest      = 500;
 static constexpr float kPad           = -1.0f;
 static constexpr int kImgSide         = 28;
