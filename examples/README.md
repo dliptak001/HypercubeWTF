@@ -16,13 +16,15 @@ Phase 4 demos. Packing is **example-owned** (not core API).
 | Target | Role | Data |
 |--------|------|------|
 | `wtf_synth` | Synthetic multi-class fields → episode → train → test | None (CI-friendly) |
-| `wtf_mnist` | MNIST pack → episode → train → test | IDX under `data/` or `WTF_MNIST_DATA` |
+| `wtf_mnist` | MNIST pack → episode → train → test | **`data/` in this repo only** |
 
 Edit knobs in each file’s `DemoConfig`.
 
 ### MNIST data
 
-Not in git. Uncompressed IDX files:
+Always `HypercubeWTF/data/` (path next to `examples/`). No env override, no other project.
+
+Uncompressed IDX (not in git):
 
 ```text
 data/train-images-idx3-ubyte
@@ -31,9 +33,9 @@ data/t10k-images-idx3-ubyte
 data/t10k-labels-idx1-ubyte
 ```
 
-Or set `WTF_MNIST_DATA` to that directory.
+See [`data/README.md`](../data/README.md) for download steps.
 
-Default demo uses a **subset** (2k train / 500 test), dim 10, DualPlane, so a run is feasible. Full 60k × dim 11 × `T=N` is a long campaign — raise `max_train` / `dim` in `DemoConfig` when you want that.
+Default demo uses a **subset** (see `DemoConfig::max_train` / `max_test`), dim 10, DualPlane. Raise those knobs for longer campaigns.
 
 ### Product note
 

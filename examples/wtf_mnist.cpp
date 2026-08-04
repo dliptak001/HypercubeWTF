@@ -10,7 +10,7 @@
 /// (ink || |grad| on low addresses + pad). Pad/low writes 784 pixels into
 /// verts [0,784) and pads the rest (requires N >= 784 → dim >= 10).
 ///
-/// Data: IDX files under data/ (or WTF_MNIST_DATA). Not shipped in-repo.
+/// Data: IDX files under this repo's data/ only (not shipped in git).
 /// Edit DemoConfig for subset size / dim / pack mode.
 
 #include "WTF.h"
@@ -19,7 +19,6 @@
 
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -35,7 +34,7 @@ enum class PackMode
 struct DemoConfig
 {
     // ----- Data -----
-    size_t max_train = 2000; // 0 = all (slow: episode cost × T)
+    size_t max_train = 20000; // 0 = all (slow: episode cost × T)
     size_t max_test = 500;
     PackMode pack = PackMode::DualPlane;
 
@@ -80,22 +79,10 @@ WTFConfig MakeWtfConfig(const DemoConfig& d)
     return cfg;
 }
 
+/// Always this repository's data/ (sibling of examples/), never another project.
 std::filesystem::path ResolveDataDir()
 {
-    if (const char* env = std::getenv("WTF_MNIST_DATA"))
-        return std::filesystem::path(env);
-
-    // Prefer <repo>/data next to examples/..
-    auto from_src = std::filesystem::path(__FILE__).parent_path().parent_path() / "data";
-    if (std::filesystem::exists(from_src / "train-images-idx3-ubyte"))
-        return from_src;
-
-    // CWD/data (run from build or repo root)
-    auto cwd = std::filesystem::current_path() / "data";
-    if (std::filesystem::exists(cwd / "train-images-idx3-ubyte"))
-        return cwd;
-
-    return from_src; // error path will name this
+    return std::filesystem::path(__FILE__).parent_path().parent_path() / "data";
 }
 
 void PackSample(const DemoConfig& d, const wtf_ex::MnistSample& s,
@@ -195,9 +182,12 @@ int main()
     {
         std::fprintf(stderr, "wtf_mnist: %s\n", e.what());
         std::fprintf(stderr,
-                     "Place IDX files in data/ (or set WTF_MNIST_DATA):\n"
-                     "  train-images-idx3-ubyte  train-labels-idx1-ubyte\n"
-                     "  t10k-images-idx3-ubyte   t10k-labels-idx1-ubyte\n");
+                     "Place uncompressed MNIST IDX files in this repo's data/:\n"
+                     "  data/train-images-idx3-ubyte\n"
+                     "  data/train-labels-idx1-ubyte\n"
+                     "  data/t10k-images-idx3-ubyte\n"
+                     "  data/t10k-labels-idx1-ubyte\n"
+                     "See data/README.md\n");
         return 1;
     }
 }

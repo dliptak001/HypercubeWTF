@@ -27,6 +27,10 @@ Testing/
 .DS_Store
 Thumbs.db
 
+# MNIST IDX binaries (keep data/README.md; files are large)
+data/*-ubyte
+data/*-ubyte.gz
+
 # Local agent notes
 .claude/
 CLAUDE.md
