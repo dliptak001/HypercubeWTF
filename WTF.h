@@ -10,13 +10,13 @@
 #include <stdexcept>
 #include <vector>
 
-/// Episode / product knobs for @ref WTF (Phase 1 skeleton — drive path lands in Phase 2).
+/// Episode / product knobs for @ref WTF.
 struct EpisodeConfig
 {
     /// Drive-pass count. 0 means “use N after construction” (default T = N).
     size_t T = 0;
 
-    /// End-of-episode delay-line ages packed into the readout (default 1).
+    /// End-of-episode delay-line ages packed into features (default 1).
     size_t readout_slices = 1; // B
 };
 
@@ -31,10 +31,10 @@ struct WTFConfig
     uint64_t ic_seed = 1;
 };
 
-/// @brief HypercubeWTF: static length-N field → driven reservoir orbit → HCNN.
+/// @brief HypercubeWTF: static length-N field → driven reservoir orbit → end features.
 ///
-/// Phase 1: constructible shell only (reservoir + readout + s0 allocation).
-/// Episode drive / train / predict arrive in later phases.
+/// Phase 2: @ref RunEpisode loads frozen s0, drives affine field translation for
+/// T passes, packs B end slices into @ref LastFeatures. Train/predict is Phase 3.
 class WTF
 {
 public:
@@ -48,12 +48,23 @@ public:
     [[nodiscard]] size_t B() const { return B_; }
     [[nodiscard]] size_t M() const { return M_; }
 
+    /// Feature length after an episode: B * N.
+    [[nodiscard]] size_t FeatureSize() const { return B_ * n_; }
+
     [[nodiscard]] const Reservoir& reservoir() const { return *reservoir_; }
     [[nodiscard]] const ReadoutConfig& readout_config() const { return readout_cfg_; }
 
-    // Phase 2+: RunEpisode, TrainOnCollected, Predict
+    /// Drive one episode. @p x must have size N (throws otherwise). Does not
+    /// modify @p x. After return, @ref LastFeatures holds the end-of-episode pack.
+    void RunEpisode(std::span<const float> x);
+
+    /// End features from the most recent successful @ref RunEpisode (length B*N).
+    /// Empty if no episode has been run yet.
+    [[nodiscard]] std::span<const float> LastFeatures() const { return last_features_; }
 
 private:
+    void PackEndFeatures();
+
     size_t n_ = 0;
     size_t M_ = 0;
     size_t T_ = 0;
@@ -65,4 +76,10 @@ private:
 
     /// Frozen IC length N×M; drawn once at construction.
     std::vector<float> s0_;
+
+    /// Scratch staging field (length N) for translated x.
+    std::vector<float> drive_;
+
+    /// Last packed end features (length B*N).
+    std::vector<float> last_features_;
 };

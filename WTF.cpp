@@ -1,6 +1,6 @@
 #include "WTF.h"
 
-#include <cmath>
+#include <cstring>
 #include <random>
 #include <stdexcept>
 
@@ -34,8 +34,6 @@ WTF::WTF(const WTFConfig& cfg)
     if (B_ > M_)
         throw std::invalid_argument("WTF: readout_slices (B) must be <= history_depth (M)");
 
-    // Readout dim must match multi-slice pack: features = B * N = 2^readout.dim
-    // when B is power of two and N = 2^res.dim → readout.dim = res.dim + log2(B).
     size_t log2_B = 0;
     for (size_t b = B_; b > 1; b >>= 1)
         ++log2_B;
@@ -46,10 +44,45 @@ WTF::WTF(const WTFConfig& cfg)
         throw std::invalid_argument(
             "WTF: readout.dim must be 0 (auto) or reservoir.dim + log2(B)");
 
-    // Frozen s0 ~ U[-0.5, 0.5] on N×M, from ic_seed only.
     s0_.assign(n_ * M_, 0.0f);
     std::mt19937_64 rng(mix64(ic_seed_ ^ 0x5343000000000001ULL));
     std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
     for (float& v : s0_)
         v = dist(rng);
+
+    drive_.assign(n_, 0.0f);
+    last_features_.clear();
+}
+
+void WTF::PackEndFeatures()
+{
+    last_features_.resize(B_ * n_);
+    for (size_t b = 0; b < B_; ++b)
+    {
+        const float* slice = reservoir_->SliceAt(b);
+        std::memcpy(last_features_.data() + b * n_, slice, n_ * sizeof(float));
+    }
+}
+
+void WTF::RunEpisode(std::span<const float> x)
+{
+    if (x.size() != n_)
+        throw std::invalid_argument(
+            "WTF::RunEpisode: x.size() must equal N = 2^dim");
+
+    // Episode start: full-depth IC (canonical ring), pass counter 0.
+    reservoir_->LoadInitialCondition(s0_.data(), s0_.size());
+
+    const size_t n_mask = n_ - 1; // N is power of two
+    size_t c = 0;
+    for (size_t pass = 0; pass < T_; ++pass)
+    {
+        for (size_t v = 0; v < n_; ++v)
+            drive_[v] = x[(v ^ c) & n_mask];
+        reservoir_->InjectInputField(drive_.data(), n_);
+        reservoir_->Step();
+        ++c;
+    }
+
+    PackEndFeatures();
 }
