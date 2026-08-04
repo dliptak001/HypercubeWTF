@@ -3,7 +3,7 @@
 > Living source of truth for goals, locked design, open questions, and workplan.
 > Update when decisions land; do not leave resolved debates only in chat.
 >
-> **Status:** design / pre-implementation.
+> **Status:** Phase 1 skeleton in progress (design locked).
 
 ---
 
@@ -267,8 +267,8 @@ Sequential gates. Docs may draft ahead; code waits on exit criteria.
 
 | Phase | Work | Exit |
 |-------|------|------|
-| **0** Charter | This file; design lock | Source trees recorded (§3) |
-| **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | Release build |
+| **0** Charter | This file; design lock | **Done** — source trees recorded (§3) |
+| **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | Release build + `wtf_smoke` |
 | **2** Episode core | Field inject; orbit; IC load; end sample; tests | Stable end features from synthetic `x` |
 | **3** Readout | End pack (B); train/predict path | E2E synthetic classification |
 | **4** Demos | Example packing helpers; spectral toy; optional real data | Example binary + short doc |
