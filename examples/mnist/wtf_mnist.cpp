@@ -7,8 +7,10 @@
 ///                  fills N exactly with a 15x16 center at (6,6)).
 ///
 /// Train collect only: optional HCNNSpatialAug on 28x28, then pack.
-/// Test path is never augmented. Prefer aug noise over episode.input_noise_sigma
-/// (leave field noise at 0 when aug N(0,σ) is on).
+/// Test is never geometrically augmented. Optional demo-only i.i.d. Gaussian on
+/// the packed test field (kTestNoiseSigma) is an eval protocol — not WTF core
+/// and not episode.input_noise_sigma (collect-only). Prefer one noise source at
+/// a time when comparing (leave collect/aug noise at 0 for clean test-noise A/B).
 ///
 /// Data: this repo's data/ (discovered via cwd / exe / source tree).
 /// Edit knobs in the sections below.
@@ -83,10 +85,10 @@ static WTFConfig MakeWTFConfig()
 
     // Reservoir (fixed dynamics)
     cfg.reservoir.dim           = 10; // N = 1024; PadLow/PadLowCenter need dim >= 10
-    cfg.reservoir.history_depth = 1;
+    cfg.reservoir.history_depth = 2;
     cfg.reservoir.seed          = 13871537636959942979ull;
     cfg.reservoir.spectral_radius = 0.95;
-    cfg.reservoir.input_scaling = 0.015;
+    cfg.reservoir.input_scaling = 0.01;//0.015;
     cfg.reservoir.bias_scaling  = 0.003;
     cfg.reservoir.verbose       = false;
 
@@ -94,25 +96,25 @@ static WTFConfig MakeWTFConfig()
     cfg.ic_seed = 12;
 
     // Episode: T = 0 means default T = N
-    cfg.episode.T              = 32;
+    cfg.episode.T              = 20;//32;
     cfg.episode.readout_slices = 1;
     // Keep 0 when train aug N(0,σ) is on — do not stack two noise sources.
     cfg.episode.input_noise_sigma = 0.0f;
     // true = pack field → readout (no orbit); PackMode still applies. Needs B=1.
-    cfg.episode.bypass_reservoir  = true;
+    cfg.episode.bypass_reservoir  = false;
 
     // Readout (trainable HCNN)
     cfg.readout.seed                    = 42;
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
-    cfg.readout.num_layers              = 2;
+    cfg.readout.num_layers              = 1;
     cfg.readout.channel_growth          = 1;
-    cfg.readout.use_pooling             = false;
+    cfg.readout.use_pooling             = true;
     cfg.readout.conv_channels           = 16;
     cfg.readout.activation              = ReadoutActivation::LEAKY_RELU;
     cfg.readout.task                    = ReadoutTask::Classification;
     cfg.readout.epochs                  = 40;
-    cfg.readout.batch_size              = 256;
+    cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;
     cfg.readout.lr_min_frac             = 0.01f;
@@ -152,6 +154,13 @@ static constexpr float kAugElasticAlpha  = 0.0f; // 0 = off
 static constexpr float kAugElasticSigma  = 5.0f; // ignored when alpha == 0
 static constexpr float kAugNoiseSigma    = 0.03f;
 static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
+
+// Test-only protocol: N(0,σ) on the packed length-N field after PackSample,
+// before PredictClass. 0 = off (default). Independent of train aug and of
+// episode.input_noise_sigma. Deterministic per sample from kTestNoiseSeedBase.
+// High-noise bypass A/B: try σ in ~0.3–0.5 on [-1,1]-ish packed fields.
+static constexpr float    kTestNoiseSigma    = 0.5f;
+static constexpr unsigned kTestNoiseSeedBase = 0x7E57u;
 
 // =============================================================================
 // Helpers
@@ -202,7 +211,17 @@ static void PrintAugReport()
         static_cast<double>(kAugNoiseSigma));
 }
 
-/// Test / unaugmented path: raw 28x28 → pack.
+static void PrintTestNoiseReport()
+{
+    if (kTestNoiseSigma <= 0.0f)
+        std::printf("wtf_mnist: test_noise=off\n");
+    else
+        std::printf("wtf_mnist: test_noise=N(0,%g) on packed field seed_base=0x%X\n",
+                    static_cast<double>(kTestNoiseSigma), kTestNoiseSeedBase);
+}
+
+/// Test path: raw 28x28 → pack (no geometric aug). Optional field noise is
+/// applied in the eval loop after this returns.
 static void PackSample(const wtf_ex::MnistSample& s,
                        std::span<float> field,
                        const hcnn::HCNNSpatialEmbedder& emb)
@@ -210,6 +229,18 @@ static void PackSample(const wtf_ex::MnistSample& s,
     if (static_cast<int>(s.pixels.size()) != kImgPixels)
         throw std::runtime_error("expected 28x28 MNIST sample");
     wtf_ex::PackMnist28(s.pixels.data(), emb, field);
+}
+
+/// In-place i.i.d. Gaussian on a packed field. No-op when kTestNoiseSigma <= 0.
+static void AddTestFieldNoise(std::span<float> field, size_t sample_index)
+{
+    if (kTestNoiseSigma <= 0.0f)
+        return;
+    std::mt19937 rng(kTestNoiseSeedBase
+                     + static_cast<unsigned>(sample_index) * 9973u);
+    std::normal_distribution<float> dist(0.0f, kTestNoiseSigma);
+    for (float& v : field)
+        v += dist(rng);
 }
 
 /// Train collect path: optional aug on 28x28, then pack.
@@ -304,6 +335,7 @@ int main(int argc, char** argv)
                             plan.N - plan.pattern_length);
             }
             PrintAugReport();
+            PrintTestNoiseReport();
             std::fflush(stdout);
 
             auto t0 = std::chrono::steady_clock::now();
@@ -328,7 +360,8 @@ int main(int argc, char** argv)
             size_t correct = 0;
             for (size_t i = 0; i < test.size(); ++i)
             {
-                PackSample(test.samples[i], field, emb); // never aug on test
+                PackSample(test.samples[i], field, emb); // no geometric aug
+                AddTestFieldNoise(field, i);             // optional eval protocol
                 if (wtf.PredictClass(field) == test.samples[i].label)
                     ++correct;
             }

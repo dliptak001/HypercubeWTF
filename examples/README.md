@@ -23,7 +23,11 @@ Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.t
 
 MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remains on the embed enum for other hosts but is not a MNIST demo option.
 
-**Train-only spatial aug** (vendored `HCNNSpatialAugmenter`): optional 2D geometry + noise on 28×28 **before** pack. Test is never augmented. Collect-once freezes one aug draw per sample.
+**Train-only spatial aug** (vendored `HCNNSpatialAugmenter`): optional 2D geometry + noise on 28×28 **before** pack. Collect-once freezes one aug draw per sample.
+
+**Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.input_noise_sigma` (collect-only).
+
+**High-noise bypass A/B** (σ=0.5, train clean): see [`mnist/RESULTS_test_noise_bypass.md`](mnist/RESULTS_test_noise_bypass.md) — orbit test_acc 0.911 vs bypass 0.847.
 
 ## Binaries
 

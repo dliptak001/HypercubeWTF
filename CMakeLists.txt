@@ -71,11 +71,11 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
 
     # Deploy binary for local tooling (e.g. C:\HypercubeWTF\wtf_mnist.exe).
     # Runs after every successful wtf_mnist link (Release and Debug build dirs).
-    add_custom_command(TARGET wtf_mnist POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "C:/HypercubeWTF"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:wtf_mnist>
-                "C:/HypercubeWTF/$<TARGET_FILE_NAME:wtf_mnist>"
-        COMMENT "Copy wtf_mnist → C:/HypercubeWTF"
-    )
+#    add_custom_command(TARGET wtf_mnist POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E make_directory "C:/HypercubeWTF"
+#        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#                $<TARGET_FILE:wtf_mnist>
+#                "C:/HypercubeWTF/$<TARGET_FILE_NAME:wtf_mnist>"
+#        COMMENT "Copy wtf_mnist → C:/HypercubeWTF"
+#    )
 endif()
