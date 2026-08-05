@@ -5,6 +5,7 @@
 #include "Reservoir.h"
 #include "WTF.h"
 
+#include <algorithm>
 #include <cstdio>
 
 namespace wtf_ex {
@@ -28,7 +29,34 @@ inline void PrintReservoirConfig(const ReservoirConfig& r,
     std::fflush(stdout);
 }
 
-/// Reservoir + episode knobs after WTF construction (N/T/B are live).
+/// Live readout shape after WTF construction (dim resolved; weight count from net).
+inline void PrintReadoutConfig(const Readout& ro)
+{
+    const ReadoutConfig& r = ro.GetConfig();
+    const int d = static_cast<int>(r.dim);
+    // Match Readout::make_layer_specs: 0 = auto min(dim-2, 2), at least 1.
+    int layers = (r.num_layers > 0) ? r.num_layers : std::min(d - 2, 2);
+    layers = std::max(layers, 1);
+
+    const char* pool = !r.use_pooling
+                           ? "off"
+                           : (r.pool_type == ReadoutPoolType::Avg) ? "avg" : "max";
+
+    const char* act = "tanh";
+    switch (r.activation) {
+        case ReadoutActivation::TANH:       act = "tanh"; break;
+        case ReadoutActivation::RELU:       act = "relu"; break;
+        case ReadoutActivation::LEAKY_RELU: act = "leaky_relu"; break;
+        case ReadoutActivation::NONE:       act = "none"; break;
+    }
+
+    std::printf("readout: layers=%d weights=%zu pooling=%s activation=%s lr_max=%.6g\n",
+                layers, ro.Weights().size(), pool, act,
+                static_cast<double>(r.lr_max));
+    std::fflush(stdout);
+}
+
+/// Reservoir + episode + readout knobs after WTF construction (N/T/B are live).
 inline void PrintWtfHeader(const char* demo_name, const WTF& wtf,
                            const WTFConfig& cfg)
 {
@@ -40,6 +68,7 @@ inline void PrintWtfHeader(const char* demo_name, const WTF& wtf,
                     ? " (auto: leave 1-2 cores free)"
                     : "");
     PrintReservoirConfig(cfg.reservoir, wtf.reservoir().GetRealizedSpectralRadius());
+    PrintReadoutConfig(wtf.readout());
     std::fflush(stdout);
 }
 

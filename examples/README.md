@@ -9,7 +9,7 @@ examples/
   README.md
   common/           # shared helpers (e.g. pack_field.h)
   synth/            # wtf_synth — synthetic multi-class fields
-  mnist/            # wtf_mnist — MNIST DualPlane / PadLow
+  mnist/            # wtf_mnist — MNIST DualPlane / PadLow / PadLowCenter
 ```
 
 Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.txt`.
@@ -20,8 +20,9 @@ Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.t
 |--------|-----|--------|
 | **Pad / low addresses** | Synth patterns; optional MNIST | data in verts `[0, P)`, pad `[P, N)` |
 | **DualPlane** | MNIST default | ink \|\| \|grad\| via vendored `HCNNSpatialEmbed` DualPlaneResize; low addresses + pad tail |
+| **PadLowCenter** | MNIST dim=10 only | full 28×28 in `[0,784)` + centered 15×16 crop in `[784,1024)` |
 
-**Not used:** standalone resize-to-N product path, letterbox/center-crop, bit-address `(row,col)→vertex` maps.
+**Not used:** standalone resize-to-N product path, bit-address `(row,col)→vertex` maps.
 
 ## Binaries
 
