@@ -23,7 +23,7 @@ inline void DoneBeep()
     // Synchronous: blocks for duration_ms (freq Hz).
     ::Beep(1500, 400);
     // Extra hold so the console / runner does not tear down mid-tail.
-    ::Sleep(150);
+    ::Sleep(1500);
 #else
     std::fputc('\a', stderr);
     std::fflush(stderr);

@@ -36,7 +36,9 @@ inline void PrintWtfHeader(const char* demo_name, const WTF& wtf,
                 demo_name, wtf.N(), wtf.T(), wtf.B(), wtf.M(),
                 static_cast<unsigned long long>(cfg.ic_seed),
                 cfg.episode.collect_threads,
-                cfg.episode.collect_threads == 0 ? " (auto)" : "");
+                cfg.episode.collect_threads == 0
+                    ? " (auto: leave 1-2 cores free)"
+                    : "");
     PrintReservoirConfig(cfg.reservoir, wtf.reservoir().GetRealizedSpectralRadius());
     std::fflush(stdout);
 }

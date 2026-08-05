@@ -21,10 +21,11 @@ struct EpisodeConfig
     size_t readout_slices = 1; // B
 
     /// Parallel workers for @ref WTF::CollectEpisodes (each owns a Reservoir
-    /// with the same frozen weights). 0 = auto (hardware_concurrency),
-    /// 1 = serial, N = N workers. Single-sample @ref CollectEpisode is always
-    /// serial on the primary reservoir.
+    /// with the same frozen weights). 0 = auto (desktop-friendly: leave 1–2
+    /// cores free for the OS/UI), 1 = serial, N = N workers (pin for max burn).
+    /// Single-sample @ref CollectEpisode is always serial on the primary.
     ///
+    /// Auto policy: max(1, hw − 1), or max(1, hw − 2) when hw ≥ 8.
     /// Worker 0 reuses the primary reservoir (no extra weight copy). Workers
     /// 1..N-1 are full clones. A persistent thread pool is kept for the WTF
     /// lifetime so bulk collects do not re-spawn OS threads each call.

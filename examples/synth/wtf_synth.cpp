@@ -44,6 +44,11 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.task               = ReadoutTask::Classification;
     cfg.readout.epochs             = 100;
     cfg.readout.batch_size         = 32;
+    // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
+    cfg.readout.lr_max             = 0.0015f;
+    cfg.readout.lr_min_frac        = 0.01f;
+    cfg.readout.lr_decay_epochs    = 0;
+    cfg.readout.weight_decay       = 0.0f;
     cfg.readout.seed               = 3;
     cfg.readout.num_threads        = 1;
     cfg.readout.restore_best_epoch = false;

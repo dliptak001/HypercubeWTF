@@ -337,8 +337,19 @@ size_t WTF::ResolveCollectThreads(size_t count) const
     size_t n = collect_threads_pref_;
     if (n == 0)
     {
+        // Leave headroom for the OS / UI (mouse, windowing) so a long collect
+        // does not peg every logical core. Explicit collect_threads = hw still
+        // allows a full burn when desired.
         const unsigned hw = std::thread::hardware_concurrency();
-        n = (hw == 0) ? 1 : static_cast<size_t>(hw);
+        if (hw == 0)
+        {
+            n = 1;
+        }
+        else
+        {
+            const unsigned reserve = (hw >= 8u) ? 2u : 1u;
+            n = (hw > reserve) ? static_cast<size_t>(hw - reserve) : 1u;
+        }
     }
     if (n < 1)
         n = 1;
