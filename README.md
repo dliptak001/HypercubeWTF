@@ -25,7 +25,7 @@ cmake --build cmake-build-release
 |--------|------|
 | `wtf_smoke` | Episode contract + small train/predict smoke |
 | `wtf_synth` | Synthetic multi-class fields (no data files) |
-| `wtf_mnist` | MNIST DualPlane/PadLow → orbit → readout (needs IDX under `data/`) |
+| `wtf_mnist` | MNIST PadLowCenter (default) / PadLow → orbit → readout (needs IDX under `data/`) |
 
 Examples and packing rules: [`examples/README.md`](examples/README.md).
 

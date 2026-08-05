@@ -9,7 +9,7 @@ examples/
   README.md
   common/           # shared helpers (e.g. pack_field.h)
   synth/            # wtf_synth — synthetic multi-class fields
-  mnist/            # wtf_mnist — MNIST DualPlane / PadLow / PadLowCenter
+  mnist/            # wtf_mnist — MNIST PadLowCenter / PadLow
 ```
 
 Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.txt`.
@@ -18,11 +18,10 @@ Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.t
 
 | Packer | Use | Layout |
 |--------|-----|--------|
-| **Pad / low addresses** | Synth patterns; optional MNIST | data in verts `[0, P)`, pad `[P, N)` |
-| **DualPlane** | MNIST default | ink \|\| \|grad\| via vendored `HCNNSpatialEmbed` DualPlaneResize; low addresses + pad tail |
-| **PadLowCenter** | MNIST dim=10 only | full 28×28 in `[0,784)` + centered 15×16 crop in `[784,1024)` |
+| **PadLow** | Synth patterns; optional MNIST | HCNN `PadLow`: data in verts `[0, P)`, pad `[P, N)` |
+| **PadLowCenter** | MNIST default (dim=10) | HCNN `PadLowCenter`: full 28×28 + centered crop in the tail |
 
-**Not used:** standalone resize-to-N product path, bit-address `(row,col)→vertex` maps.
+MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remains on the embed enum for other hosts but is not a MNIST demo option.
 
 ## Binaries
 

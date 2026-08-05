@@ -1,11 +1,10 @@
 /// @file wtf_mnist.cpp
 /// @brief MNIST → pack length-N field → WTF episode → train end-state readout.
 ///
-/// Packing is example-owned.
-///   DualPlane — vendored HCNN SpatialEmbed (ink || |grad| + pad tail).
-///   PadLow — raw 784 in [0,784), pad [784,N) (needs N >= 784 → dim >= 10).
-///   PadLowCenter — dim=10 only: full 28x28 in [0,784) + centered 15x16 in
-///                  [784,1024) (reclaims the pad tail as a native-res zoom).
+/// Packing is example-owned and uses vendored HCNN SpatialEmbed modes:
+///   PadLow       — full 28x28 in [0,784), pad [784,N) (needs N >= 784).
+///   PadLowCenter — full 28x28 + centered crop in the tail (default; dim=10
+///                  fills N exactly with a 15x16 center at (6,6)).
 ///
 /// Data: this repo's data/ (discovered via cwd / exe / source tree).
 /// Edit knobs in the sections below.
@@ -20,37 +19,54 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 // =============================================================================
-// Pack mode (demo task — not part of WTFConfig)
+// Pack mode (demo task — maps to HCNNSpatialEmbedMode)
 // =============================================================================
 
 enum class PackMode
 {
-    DualPlane,    // multi-view field (default)
-    PadLow,       // raw 784 in low addresses + pad
-    PadLowCenter, // dim=10: full 28x28 + centered 15x16 in the 240-tail
+    PadLow,       // HCNNSpatialEmbedMode::PadLow
+    PadLowCenter, // HCNNSpatialEmbedMode::PadLowCenter (default)
 };
+
+static hcnn::HCNNSpatialEmbedMode ToEmbedMode(PackMode pack)
+{
+    switch (pack)
+    {
+    case PackMode::PadLow:       return hcnn::HCNNSpatialEmbedMode::PadLow;
+    case PackMode::PadLowCenter: return hcnn::HCNNSpatialEmbedMode::PadLowCenter;
+    }
+    return hcnn::HCNNSpatialEmbedMode::PadLowCenter;
+}
+
+static const char* PackModeName(PackMode pack)
+{
+    switch (pack)
+    {
+    case PackMode::PadLow:       return "PadLow";
+    case PackMode::PadLowCenter: return "PadLowCenter";
+    }
+    return "?";
+}
 
 // =============================================================================
 // WTF configuration — primary knobs for this demo (edit here)
 // =============================================================================
 //
 // BEST RUN SO FAR (record only — do not overwrite live knobs below):
-//   test_acc=0.968 (968/1000)  acc_on_collected=0.982  collect+train=164.8s
+//   test_acc=0.975 (9754/10000)  acc_on_collected=0.995  collect+train=157.2s
 //   dim=10 N=1024  M=1  T=32  B=1  ic_seed=12
 //   reservoir.seed=13871537636959942979  SR_target=0.95  (realized ~0.9507)
-//   input_scaling=0.015  leak=1  bias_scale=0.003 (default)
-//   pack=DualPlane  S=22 pattern=968 pad_tail=56
-//   train=60000  test=1000  epochs=40  batch_size=32  lr_max=0.001
-//   readout.seed=42  num_layers=1  conv_channels=16  activation=NONE
+//   input_scaling=0.015  leak=1  bias_scale=0.003
+//   pack=PadLowCenter  full=28x28@ [0,784)  center=15x16@(6,6) -> [784,1024)
+//   train=60000  test=10000  epochs=40  batch_size=32  lr_max=0.0015
+//   readout.seed=42  num_layers=1  conv_channels=16  pooling=max  activation=NONE
 //   restore_best_epoch=true  best_epoch_holdout_frac=0.1
-// Other seeds tried (weaker): 13769974450290969021 (0.964),
-//   6963774647319908809 (0.963), 5330595307729750981 (0.962).
+// Same knobs PadLow control: test_acc=0.966 (9659/10000) acc_on_collected=0.982
 // =============================================================================
 
 static WTFConfig MakeWTFConfig()
@@ -58,9 +74,9 @@ static WTFConfig MakeWTFConfig()
     WTFConfig cfg;
 
     // Reservoir (fixed dynamics)
-    cfg.reservoir.dim           = 10; // N = 1024; DualPlane S≈22; PadLow needs dim >= 10
+    cfg.reservoir.dim           = 10; // N = 1024; PadLow/PadLowCenter need dim >= 10
     cfg.reservoir.history_depth = 1;
-    cfg.reservoir.seed          = 13871537636959942979ull;//13871537636959942979ull(test_acc=0.965); 13769974450290969021 (test_acc=0.964); 6963774647319908809ull (test_acc=0.963); 5330595307729750981ull(test_acc=0.962);
+    cfg.reservoir.seed          = 13871537636959942979ull;
     cfg.reservoir.spectral_radius = 0.95;
     cfg.reservoir.input_scaling = 0.015;
     cfg.reservoir.bias_scaling  = 0.003;
@@ -77,22 +93,21 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.seed                    = 42;
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
-    cfg.readout.num_layers              = 3;
-    cfg.readout.use_pooling             = false;
+    cfg.readout.num_layers              = 1;
+    cfg.readout.use_pooling             = true;
     cfg.readout.conv_channels           = 16;
     cfg.readout.activation              = ReadoutActivation::RELU;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.epochs                  = 40;
-    cfg.readout.batch_size              = 256;//32;
+    cfg.readout.epochs                  = 1;//40;
+    cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
-    cfg.readout.lr_max                  = 0.0015;
+    cfg.readout.lr_max                  = 0.0015f;
     cfg.readout.lr_min_frac             = 0.01f;
     cfg.readout.lr_decay_epochs         = 0;
     cfg.readout.weight_decay            = 0.0f;
     cfg.readout.num_threads             = 0; // 0 = HCNN auto
     cfg.readout.restore_best_epoch      = true;
-    cfg.readout.momentum                = 0.9f; // SGD only; ignored by Adam
-    cfg.readout.optimizer               = ReadoutOptimizer::Adam;;  // TODO - try sdg...
+    cfg.readout.optimizer               = ReadoutOptimizer::Adam;
     cfg.readout.best_epoch_holdout_frac = 0.1f; // tail of collected buffer only
 
     return cfg;
@@ -102,7 +117,7 @@ static WTFConfig MakeWTFConfig()
 // Demo / task parameters (not part of WTFConfig)
 // =============================================================================
 
-static constexpr PackMode kPack       = PackMode::DualPlane;
+static constexpr PackMode kPack       = PackMode::PadLowCenter;
 static constexpr size_t kMaxTrain     = 60000; // short default; campaign: 20000 / 0=all
 static constexpr size_t kMaxTest      = 10000;
 static constexpr float kPad           = -1.0f;
@@ -114,41 +129,13 @@ static constexpr double kMinTestAcc   = 0.50; // soft CI floor
 // Helpers
 // =============================================================================
 
-static const char* PackModeName(PackMode pack)
-{
-    switch (pack)
-    {
-    case PackMode::DualPlane:    return "DualPlane";
-    case PackMode::PadLow:       return "PadLow";
-    case PackMode::PadLowCenter: return "PadLowCenter";
-    }
-    return "?";
-}
-
 static void PackSample(const wtf_ex::MnistSample& s,
                        std::span<float> field,
-                       PackMode pack,
-                       const hcnn::HCNNSpatialEmbedder* dual_emb)
+                       const hcnn::HCNNSpatialEmbedder& emb)
 {
     if (static_cast<int>(s.pixels.size()) != kImgPixels)
         throw std::runtime_error("expected 28x28 MNIST sample");
-
-    if (pack == PackMode::DualPlane)
-    {
-        if (dual_emb == nullptr)
-            throw std::logic_error("DualPlane pack requires embedder");
-        wtf_ex::PackDualPlane28(s.pixels.data(), *dual_emb, field);
-    }
-    else if (pack == PackMode::PadLowCenter)
-    {
-        wtf_ex::PackPadLowCenter28(s.pixels.data(), field);
-    }
-    else
-    {
-        if (field.size() < static_cast<size_t>(kImgPixels))
-            throw std::runtime_error("PadLow requires N >= 784 (use dim >= 10)");
-        wtf_ex::PackPadLow(s.pixels, field, kPad);
-    }
+    wtf_ex::PackMnist28(s.pixels.data(), emb, field);
 }
 
 // =============================================================================
@@ -159,17 +146,12 @@ int main(int argc, char** argv)
     try
     {
         const WTFConfig cfg = MakeWTFConfig();
-
         const size_t N_field = size_t{1} << cfg.reservoir.dim;
-        if (kPack == PackMode::PadLow && N_field < static_cast<size_t>(kImgPixels))
-        {
-            std::fprintf(stderr, "wtf_mnist: PadLow needs dim >= 10\n");
-        }
-        else if (kPack == PackMode::PadLowCenter
-                 && N_field != static_cast<size_t>(wtf_ex::kPadLowCenterN))
+
+        if (N_field < static_cast<size_t>(kImgPixels))
         {
             std::fprintf(stderr,
-                         "wtf_mnist: PadLowCenter needs dim=10 (N=1024), got N=%zu\n",
+                         "wtf_mnist: pack needs N >= 784 (dim >= 10), got N=%zu\n",
                          N_field);
         }
         else
@@ -193,31 +175,29 @@ int main(int argc, char** argv)
             wtf_ex::PrintWtfHeader("wtf_mnist", wtf, cfg);
             std::vector<float> field(wtf.N());
 
-            // One DualPlane embedder for the whole run (not per sample).
-            std::optional<hcnn::HCNNSpatialEmbedder> dual_emb;
-            if (kPack == PackMode::DualPlane)
-                dual_emb = wtf_ex::MakeDualPlaneEmbedder(
-                    static_cast<int>(cfg.reservoir.dim), kPad);
-            const hcnn::HCNNSpatialEmbedder* emb_ptr =
-                dual_emb ? &*dual_emb : nullptr;
+            const auto emb = wtf_ex::MakeMnistEmbedder(
+                static_cast<int>(cfg.reservoir.dim), ToEmbedMode(kPack), kPad);
+            if (static_cast<size_t>(emb.capacity()) != wtf.N())
+                throw std::logic_error("embed capacity does not match WTF N");
 
+            const auto plan = emb.plan(kImgSide, kImgSide);
             std::printf("wtf_mnist: pack=%s train=%zu test=%zu epochs=%d\n",
                         PackModeName(kPack), train.size(), test.size(),
                         cfg.readout.epochs);
-            if (dual_emb)
-            {
-                const auto plan = dual_emb->plan(kImgSide, kImgSide);
-                std::printf("wtf_mnist: DualPlane S=%d pattern=%d pad_tail=%d\n",
-                            plan.plane_side, plan.pattern_length,
-                            plan.N - plan.pattern_length);
-            }
             if (kPack == PackMode::PadLowCenter)
             {
                 std::printf(
-                    "wtf_mnist: PadLowCenter full=28x28@ [0,784) "
-                    "center=%dx%d@(%d,%d) -> [784,1024)\n",
-                    wtf_ex::kPadLowCenterCropH, wtf_ex::kPadLowCenterCropW,
-                    wtf_ex::kPadLowCenterRow0, wtf_ex::kPadLowCenterCol0);
+                    "wtf_mnist: PadLowCenter full=%dx%d@ [0,%d) "
+                    "center=%dx%d@(%d,%d) pattern=%d N=%d\n",
+                    plan.height_in, plan.width_in, kImgPixels,
+                    plan.crop_h, plan.crop_w, plan.crop_row0, plan.crop_col0,
+                    plan.pattern_length, plan.N);
+            }
+            else
+            {
+                std::printf("wtf_mnist: PadLow pattern=%d N=%d pad_tail=%d\n",
+                            plan.pattern_length, plan.N,
+                            plan.N - plan.pattern_length);
             }
             std::fflush(stdout);
 
@@ -231,7 +211,7 @@ int main(int argc, char** argv)
             wtf.CollectEpisodes(
                 train.size(), train_labels,
                 [&](size_t i, std::span<float> out_field) {
-                    PackSample(train.samples[i], out_field, kPack, emb_ptr);
+                    PackSample(train.samples[i], out_field, emb);
                 });
             std::printf("Training readout on %zu episodes...\n", wtf.NumCollected());
             std::fflush(stdout);
@@ -243,7 +223,7 @@ int main(int argc, char** argv)
             size_t correct = 0;
             for (size_t i = 0; i < test.size(); ++i)
             {
-                PackSample(test.samples[i], field, kPack, emb_ptr);
+                PackSample(test.samples[i], field, emb);
                 if (wtf.PredictClass(field) == test.samples[i].label)
                     ++correct;
             }

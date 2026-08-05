@@ -217,7 +217,7 @@ features = pack end ages 0 .. B-1     // default B = 1
 
 | ID | Question | Notes |
 |----|----------|-------|
-| Q8 | First demo | **Done** — `wtf_synth` + `wtf_mnist` (DualPlane / PadLow); Raman later |
+| Q8 | First demo | **Done** — `wtf_synth` + `wtf_mnist` (PadLowCenter / PadLow); Raman later |
 | — | Train collect / batch API shape | revisit later (`RunEpisode` + collect vs other) |
 
 ---
@@ -271,7 +271,7 @@ Sequential gates. Docs may draft ahead; code waits on exit criteria.
 | **1** Skeleton | CMake C++23; vendor HCNN; fork Reservoir/Readout (strip fb / stream cruft); empty `WTF`; README | **Done** — Release build + `wtf_smoke` |
 | **2** Episode core | Field inject; orbit; IC load; end sample; tests | **Done** — `RunEpisode` + smoke tests |
 | **3** Readout | End pack (B); train/predict path | **Done** — CollectEpisode / TrainOnCollected / Predict* |
-| **4** Demos | Example packing (PadLow + DualPlane); `wtf_synth`; `wtf_mnist` | **Done** — see `examples/` |
+| **4** Demos | Example packing (PadLowCenter default + PadLow); `wtf_synth`; `wtf_mnist` | **Done** — see `examples/` |
 | **5** Polish | C++ perf, docs, richer example packing as needed | Solid C++ core |
 
 **Python SDK / bindings:** not in this workplan. Only after the C++ core is
@@ -305,3 +305,5 @@ solid. Do not scaffold Python early.
 | 2026-08-04 | First copy: HypercubeESN **`feedback`** (not main) @ ae3fb64…; HypercubeCNN main @ 20bbb23… |
 | 2026-08-04 | Phase 3 collect/train/predict; smoke episode contract (`T>N`, `B=2`, IC seed split) |
 | 2026-08-04 | Phase 4: `wtf_synth`, `wtf_mnist`; pack = PadLow + DualPlane only (no resize/letterbox/bit-map) |
+| 2026-08-05 | `PadLowCenter` (full 28×28 + 15×16 center tail) becomes MNIST default; DualPlane removed from demos |
+| 2026-08-05 | Spatial pack modes live in HypercubeCNN (`PadLow` rename of RowMajorPad + `PadLowCenter`); WTF demos call SpatialEmbed |

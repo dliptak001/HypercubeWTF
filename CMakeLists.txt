@@ -57,6 +57,10 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
             target_link_options(${name} PRIVATE
                 $<$<CONFIG:Debug>:-Wl,--allow-multiple-definition>)
         endif()
+        if(WIN32)
+            # done_beep.h → PlaySound (system aliases); Beep() is unreliable.
+            target_link_libraries(${name} PRIVATE winmm)
+        endif()
     endfunction()
 
     wtf_add_exe(wtf_smoke SOURCES tests/wtf_smoke.cpp)
@@ -64,4 +68,14 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     wtf_add_exe(wtf_mnist
         SOURCES examples/mnist/wtf_mnist.cpp
         INCLUDES ${PROJECT_SOURCE_DIR}/examples/mnist)
+
+    # Deploy binary for local tooling (e.g. C:\HypercubeWTF\wtf_mnist.exe).
+    # Runs after every successful wtf_mnist link (Release and Debug build dirs).
+    add_custom_command(TARGET wtf_mnist POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "C:/HypercubeWTF"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wtf_mnist>
+                "C:/HypercubeWTF/$<TARGET_FILE_NAME:wtf_mnist>"
+        COMMENT "Copy wtf_mnist → C:/HypercubeWTF"
+    )
 endif()
