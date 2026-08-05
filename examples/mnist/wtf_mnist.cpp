@@ -90,15 +90,16 @@ static WTFConfig MakeWTFConfig()
     cfg.episode.readout_slices = 1;
 
     // Readout (trainable HCNN)
+    cfg.episode.input_noise_sigma       = 0.0f;
     cfg.readout.seed                    = 42;
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
     cfg.readout.num_layers              = 1;
     cfg.readout.use_pooling             = true;
     cfg.readout.conv_channels           = 16;
-    cfg.readout.activation              = ReadoutActivation::RELU;
+    cfg.readout.activation              = ReadoutActivation::LEAKY_RELU;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.epochs                  = 1;//40;
+    cfg.readout.epochs                  = 40;
     cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;

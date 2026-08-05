@@ -30,6 +30,13 @@ struct EpisodeConfig
     /// 1..N-1 are full clones. A persistent thread pool is kept for the WTF
     /// lifetime so bulk collects do not re-spawn OS threads each call.
     size_t collect_threads = 0;
+
+    /// Collect-only i.i.d. Gaussian noise on the length-N field before the
+    /// episode (σ of N(0,σ) per vertex). 0 = off (default; zero cost on collect).
+    /// Applied on @ref CollectEpisode / @ref CollectEpisodes only — not on
+    /// @ref RunEpisode / @ref Predict / @ref PredictClass. Fresh draw every
+    /// collected sample (deterministic from ic_seed + sample index).
+    float input_noise_sigma = 0.0f;
 };
 
 /// Full product configuration.
@@ -140,6 +147,7 @@ private:
         std::unique_ptr<Reservoir> owned; // null for primary alias
         std::vector<float> drive;         // length N; empty if using drive_
         std::vector<float> field;         // length N pack scratch
+        std::vector<float> noise;         // length N if input_noise_sigma_ > 0
         float* drive_ptr = nullptr;       // → drive_ or drive.data()
     };
 
@@ -172,6 +180,7 @@ private:
     size_t B_ = 1;
     uint64_t ic_seed_ = 0;
     size_t collect_threads_pref_ = 0; // raw config (0 = auto)
+    float input_noise_sigma_ = 0.0f;  // collect-only; 0 = off
 
     std::unique_ptr<Reservoir> reservoir_;
     std::unique_ptr<Readout> readout_;
@@ -181,6 +190,7 @@ private:
     std::vector<float> s0_;
     std::vector<float> drive_;
     std::vector<float> last_features_;
+    std::vector<float> noise_field_; // serial CollectEpisode scratch when σ > 0
 
     std::vector<float> collected_features_; // num_collected_ * FeatureSize()
     std::vector<int> collected_labels_;     // classification: one int per episode

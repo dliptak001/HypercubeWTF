@@ -60,13 +60,15 @@ inline void PrintReadoutConfig(const Readout& ro)
 inline void PrintWtfHeader(const char* demo_name, const WTF& wtf,
                            const WTFConfig& cfg)
 {
-    std::printf("%s: N=%zu T=%zu B=%zu M=%zu ic_seed=%llu collect_threads=%zu%s\n",
+    std::printf("%s: N=%zu T=%zu B=%zu M=%zu ic_seed=%llu collect_threads=%zu%s "
+                "input_noise_sigma=%.4g\n",
                 demo_name, wtf.N(), wtf.T(), wtf.B(), wtf.M(),
                 static_cast<unsigned long long>(cfg.ic_seed),
                 cfg.episode.collect_threads,
                 cfg.episode.collect_threads == 0
                     ? " (auto: leave 1-2 cores free)"
-                    : "");
+                    : "",
+                static_cast<double>(cfg.episode.input_noise_sigma));
     PrintReservoirConfig(cfg.reservoir, wtf.reservoir().GetRealizedSpectralRadius());
     PrintReadoutConfig(wtf.readout());
     std::fflush(stdout);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <cstring>
 #include <exception>
@@ -20,6 +21,16 @@ uint64_t mix64(uint64_t x)
     x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
     x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
     return x ^ (x >> 31);
+}
+
+/// y[i] = x[i] + N(0, sigma). Deterministic stream from @p salt.
+void add_gaussian_noise(const float* x, float* y, size_t n, float sigma,
+                        uint64_t salt)
+{
+    std::mt19937 rng(static_cast<std::uint32_t>(mix64(salt)));
+    std::normal_distribution<float> dist(0.0f, sigma);
+    for (size_t i = 0; i < n; ++i)
+        y[i] = x[i] + dist(rng);
 }
 
 } // namespace
@@ -176,6 +187,7 @@ private:
 WTF::WTF(const WTFConfig& cfg)
     : ic_seed_(cfg.ic_seed),
       collect_threads_pref_(cfg.episode.collect_threads),
+      input_noise_sigma_(cfg.episode.input_noise_sigma),
       readout_cfg_(cfg.readout),
       reservoir_cfg_(cfg.reservoir)
 {
@@ -186,6 +198,10 @@ WTF::WTF(const WTFConfig& cfg)
     T_ = cfg.episode.T == 0 ? n_ : cfg.episode.T;
     if (T_ == 0)
         throw std::invalid_argument("WTF: episode T must be > 0");
+
+    if (!(input_noise_sigma_ >= 0.0f) || !std::isfinite(input_noise_sigma_))
+        throw std::invalid_argument(
+            "WTF: episode.input_noise_sigma must be finite and >= 0");
 
     B_ = cfg.episode.readout_slices;
     if (B_ == 0 || (B_ & (B_ - 1)) != 0)
@@ -225,6 +241,8 @@ WTF::WTF(const WTFConfig& cfg)
     primary.res = reservoir_.get();
     primary.drive_ptr = drive_.data();
     primary.field.assign(n_, 0.0f);
+    if (input_noise_sigma_ > 0.0f)
+        primary.noise.assign(n_, 0.0f);
     collect_workers_.push_back(std::move(primary));
 }
 
@@ -298,7 +316,19 @@ void WTF::RequireRegression() const
 
 void WTF::AppendFeatures(std::span<const float> x)
 {
-    RunEpisode(x);
+    // Collect-only noise: Predict/RunEpisode paths never enter here.
+    if (input_noise_sigma_ > 0.0f)
+    {
+        if (noise_field_.size() != n_)
+            noise_field_.assign(n_, 0.0f);
+        add_gaussian_noise(x.data(), noise_field_.data(), n_, input_noise_sigma_,
+                           mix64(ic_seed_ ^ (0x4E4F495300000001ULL + num_collected_)));
+        RunEpisode(noise_field_);
+    }
+    else
+    {
+        RunEpisode(x);
+    }
 
     const size_t f = FeatureSize();
     const size_t off = num_collected_ * f;
@@ -380,6 +410,8 @@ void WTF::EnsureCollectWorkers(size_t n)
             w.drive.assign(n_, 0.0f);
             w.drive_ptr = w.drive.data();
             w.field.assign(n_, 0.0f);
+            if (input_noise_sigma_ > 0.0f)
+                w.noise.assign(n_, 0.0f);
             fresh[k] = std::move(w);
         }
         catch (...)
@@ -442,6 +474,10 @@ void WTF::CollectFeaturesParallel(
     EnsureCollectWorkers(nw);
     EnsureCollectPool(nw);
 
+    // Hoist σ check out of the sample loop (predictable; σ==0 is the common path).
+    const float sigma = input_noise_sigma_;
+    const bool do_noise = (sigma > 0.0f);
+
     auto run_range = [&](size_t tid, size_t begin, size_t end) {
         CollectWorker& w = collect_workers_[tid];
         for (size_t i = begin; i < end; ++i)
@@ -455,6 +491,14 @@ void WTF::CollectFeaturesParallel(
             {
                 fill_field(i, std::span<float>(w.field.data(), n_));
                 x = std::span<const float>(w.field.data(), n_);
+            }
+
+            if (do_noise)
+            {
+                add_gaussian_noise(
+                    x.data(), w.noise.data(), n_, sigma,
+                    mix64(ic_seed_ ^ (0x4E4F495300000001ULL + base + i)));
+                x = std::span<const float>(w.noise.data(), n_);
             }
 
             // Write end-state features straight into the collected matrix.

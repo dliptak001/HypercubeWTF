@@ -344,6 +344,35 @@ int main()
             std::printf("wtf_smoke: ok parallel collect acc=%.3f\n", acc_p);
         }
 
+        // ----- Collect input noise: σ only on collect; RunEpisode stays clean -----
+        {
+            auto cfg = MakeCfg();
+            cfg.readout.epochs = 1;
+            cfg.readout.num_threads = 1;
+            cfg.episode.collect_threads = 1;
+            cfg.episode.input_noise_sigma = 0.05f;
+
+            auto x = MakeField(32, 0);
+            WTF noisy(cfg);
+            noisy.CollectEpisode(x, 0);
+            noisy.RunEpisode(x);
+
+            cfg.episode.input_noise_sigma = 0.0f;
+            WTF clean(cfg);
+            clean.RunEpisode(x);
+            if (!Near(noisy.LastFeatures(), clean.LastFeatures()))
+            {
+                std::fprintf(stderr, "input_noise: RunEpisode must ignore σ\n");
+                return 1;
+            }
+            if (noisy.NumCollected() != 1)
+            {
+                std::fprintf(stderr, "input_noise: collect count\n");
+                return 1;
+            }
+            std::printf("wtf_smoke: ok input_noise_sigma path\n");
+        }
+
         return 0;
     }
     catch (const std::exception& e)
