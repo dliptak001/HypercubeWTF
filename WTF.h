@@ -37,6 +37,11 @@ struct EpisodeConfig
     /// @ref RunEpisode / @ref Predict / @ref PredictClass. Fresh draw every
     /// collected sample (deterministic from ic_seed + sample index).
     float input_noise_sigma = 0.0f;
+
+    /// If true, skip the reservoir orbit: readout features are the length-N
+    /// packed field itself (host packing / PackMode still applies). Requires
+    /// readout_slices B == 1. Collect noise still applies when σ > 0.
+    bool bypass_reservoir = false;
 };
 
 /// Full product configuration.
@@ -81,12 +86,16 @@ public:
     [[nodiscard]] const Readout& readout() const { return *readout_; }
     [[nodiscard]] const ReadoutConfig& readout_config() const { return readout_cfg_; }
 
-    /// Drive one episode. @p x must have size N. Does not modify @p x.
-    /// After return, @ref LastFeatures holds the end-of-episode pack.
+    /// Drive one episode (or copy field → features when @ref EpisodeConfig::bypass_reservoir).
+    /// @p x must have size N. Does not modify @p x.
+    /// After return, @ref LastFeatures holds the feature pack (B*N).
     void RunEpisode(std::span<const float> x);
 
     /// End features from the most recent successful @ref RunEpisode (length B*N).
     [[nodiscard]] std::span<const float> LastFeatures() const { return last_features_; }
+
+    /// True when the reservoir orbit is skipped (field → readout).
+    [[nodiscard]] bool BypassReservoir() const { return bypass_reservoir_; }
 
     /// Drop all samples collected for batch training.
     /// Does not free collect-worker reservoirs or the collect thread pool.
@@ -181,6 +190,7 @@ private:
     uint64_t ic_seed_ = 0;
     size_t collect_threads_pref_ = 0; // raw config (0 = auto)
     float input_noise_sigma_ = 0.0f;  // collect-only; 0 = off
+    bool bypass_reservoir_ = false;   // field → features, no orbit
 
     std::unique_ptr<Reservoir> reservoir_;
     std::unique_ptr<Readout> readout_;

@@ -373,6 +373,43 @@ int main()
             std::printf("wtf_smoke: ok input_noise_sigma path\n");
         }
 
+        // ----- bypass_reservoir: field is features; collect+train still works -----
+        {
+            auto cfg = MakeCfg();
+            cfg.episode.bypass_reservoir = true;
+            cfg.episode.readout_slices = 1;
+            cfg.readout.epochs = 40;
+            cfg.readout.num_threads = 1;
+            cfg.episode.collect_threads = 1;
+
+            WTF wtf(cfg);
+            if (!wtf.BypassReservoir() || wtf.FeatureSize() != wtf.N())
+            {
+                std::fprintf(stderr, "bypass: FeatureSize/N mismatch\n");
+                return 1;
+            }
+            auto x0 = MakeField(wtf.N(), 0);
+            auto x1 = MakeField(wtf.N(), 1);
+            wtf.RunEpisode(x0);
+            if (!Near(wtf.LastFeatures(), x0))
+            {
+                std::fprintf(stderr, "bypass: RunEpisode must copy field\n");
+                return 1;
+            }
+            for (int i = 0; i < 20; ++i)
+            {
+                wtf.CollectEpisode(x0, 0);
+                wtf.CollectEpisode(x1, 1);
+            }
+            wtf.TrainOnCollected();
+            if (wtf.PredictClass(x0) != 0 || wtf.PredictClass(x1) != 1)
+            {
+                std::fprintf(stderr, "bypass: PredictClass failed\n");
+                return 1;
+            }
+            std::printf("wtf_smoke: ok bypass_reservoir path\n");
+        }
+
         return 0;
     }
     catch (const std::exception& e)

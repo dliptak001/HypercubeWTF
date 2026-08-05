@@ -23,6 +23,8 @@ Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.t
 
 MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remains on the embed enum for other hosts but is not a MNIST demo option.
 
+**Train-only spatial aug** (vendored `HCNNSpatialAugmenter`): optional 2D geometry + noise on 28×28 **before** pack. Test is never augmented. Collect-once freezes one aug draw per sample.
+
 ## Binaries
 
 | Target | Folder | Data |

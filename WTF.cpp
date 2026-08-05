@@ -188,6 +188,7 @@ WTF::WTF(const WTFConfig& cfg)
     : ic_seed_(cfg.ic_seed),
       collect_threads_pref_(cfg.episode.collect_threads),
       input_noise_sigma_(cfg.episode.input_noise_sigma),
+      bypass_reservoir_(cfg.episode.bypass_reservoir),
       readout_cfg_(cfg.readout),
       reservoir_cfg_(cfg.reservoir)
 {
@@ -208,6 +209,9 @@ WTF::WTF(const WTFConfig& cfg)
         throw std::invalid_argument("WTF: readout_slices (B) must be a power of two >= 1");
     if (B_ > M_)
         throw std::invalid_argument("WTF: readout_slices (B) must be <= history_depth (M)");
+    if (bypass_reservoir_ && B_ != 1)
+        throw std::invalid_argument(
+            "WTF: episode.bypass_reservoir requires readout_slices (B) == 1");
 
     size_t log2_B = 0;
     for (size_t b = B_; b > 1; b >>= 1)
@@ -288,7 +292,16 @@ void WTF::RunEpisodeOn(Reservoir& res, float* drive,
 
 void WTF::RunEpisode(std::span<const float> x)
 {
+    if (x.size() != n_)
+        throw std::invalid_argument(
+            "WTF::RunEpisode: x.size() must equal N = 2^dim");
     last_features_.resize(FeatureSize());
+    if (bypass_reservoir_)
+    {
+        // B == 1 enforced at construct: features are the packed field.
+        std::memcpy(last_features_.data(), x.data(), n_ * sizeof(float));
+        return;
+    }
     RunEpisodeOn(*reservoir_, drive_.data(), x, last_features_);
 }
 
@@ -474,9 +487,10 @@ void WTF::CollectFeaturesParallel(
     EnsureCollectWorkers(nw);
     EnsureCollectPool(nw);
 
-    // Hoist σ check out of the sample loop (predictable; σ==0 is the common path).
+    // Hoist flags out of the sample loop (predictable; off is the common path).
     const float sigma = input_noise_sigma_;
     const bool do_noise = (sigma > 0.0f);
+    const bool bypass = bypass_reservoir_;
 
     auto run_range = [&](size_t tid, size_t begin, size_t end) {
         CollectWorker& w = collect_workers_[tid];
@@ -501,10 +515,17 @@ void WTF::CollectFeaturesParallel(
                 x = std::span<const float>(w.noise.data(), n_);
             }
 
-            // Write end-state features straight into the collected matrix.
             float* feat_out = collected_features_.data() + (base + i) * f;
-            RunEpisodeOn(*w.res, w.drive_ptr, x,
-                         std::span<float>(feat_out, f));
+            if (bypass)
+            {
+                // B==1: packed field is the readout feature vector.
+                std::memcpy(feat_out, x.data(), n_ * sizeof(float));
+            }
+            else
+            {
+                RunEpisodeOn(*w.res, w.drive_ptr, x,
+                             std::span<float>(feat_out, f));
+            }
         }
     };
 

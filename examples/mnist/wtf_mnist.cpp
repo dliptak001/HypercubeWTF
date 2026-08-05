@@ -6,6 +6,10 @@
 ///   PadLowCenter — full 28x28 + centered crop in the tail (default; dim=10
 ///                  fills N exactly with a 15x16 center at (6,6)).
 ///
+/// Train collect only: optional HCNNSpatialAug on 28x28, then pack.
+/// Test path is never augmented. Prefer aug noise over episode.input_noise_sigma
+/// (leave field noise at 0 when aug N(0,σ) is on).
+///
 /// Data: this repo's data/ (discovered via cwd / exe / source tree).
 /// Edit knobs in the sections below.
 
@@ -16,9 +20,13 @@
 #include "pack_field.h"
 #include "print_config.h"
 
+#include "HCNNSpatialAug.h"
+
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -88,19 +96,23 @@ static WTFConfig MakeWTFConfig()
     // Episode: T = 0 means default T = N
     cfg.episode.T              = 32;
     cfg.episode.readout_slices = 1;
+    // Keep 0 when train aug N(0,σ) is on — do not stack two noise sources.
+    cfg.episode.input_noise_sigma = 0.0f;
+    // true = pack field → readout (no orbit); PackMode still applies. Needs B=1.
+    cfg.episode.bypass_reservoir  = true;
 
     // Readout (trainable HCNN)
-    cfg.episode.input_noise_sigma       = 0.0f;
     cfg.readout.seed                    = 42;
     cfg.readout.dim                     = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs             = 10;
-    cfg.readout.num_layers              = 1;
-    cfg.readout.use_pooling             = true;
+    cfg.readout.num_layers              = 2;
+    cfg.readout.channel_growth          = 1;
+    cfg.readout.use_pooling             = false;
     cfg.readout.conv_channels           = 16;
     cfg.readout.activation              = ReadoutActivation::LEAKY_RELU;
     cfg.readout.task                    = ReadoutTask::Classification;
     cfg.readout.epochs                  = 40;
-    cfg.readout.batch_size              = 64;
+    cfg.readout.batch_size              = 256;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;
     cfg.readout.lr_min_frac             = 0.01f;
@@ -126,10 +138,71 @@ static constexpr int kImgSide         = 28;
 static constexpr int kImgPixels       = kImgSide * kImgSide;
 static constexpr double kMinTestAcc   = 0.50; // soft CI floor
 
+// Train-only 2D aug (HCNNSpatialAug), then PackMode. Test is never augmented.
+// Report line format (when on):
+//   aug=rot+/-12+scale[0.9,1.1]+shift+/-2+shear_x+/-0.15+shear_y+/-0+elastic(a=0,s=5)+N(0,0.03)
+static constexpr bool  kTrainAug         = false;
+static constexpr float kAugRotDegMax     = 12.0f;
+static constexpr float kAugScaleMin      = 0.9f;
+static constexpr float kAugScaleMax      = 1.1f;
+static constexpr int   kAugShiftMax      = 2;
+static constexpr float kAugShearXMax     = 0.15f;
+static constexpr float kAugShearYMax     = 0.0f;
+static constexpr float kAugElasticAlpha  = 0.0f; // 0 = off
+static constexpr float kAugElasticSigma  = 5.0f; // ignored when alpha == 0
+static constexpr float kAugNoiseSigma    = 0.03f;
+static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
+
 // =============================================================================
 // Helpers
 // =============================================================================
 
+static hcnn::HCNNSpatialAugConfig MakeTrainAugConfig()
+{
+    if (!kTrainAug)
+        return hcnn::HCNNSpatialAugConfig::None();
+
+    hcnn::HCNNSpatialAugConfig ac;
+    ac.rot_deg_max   = kAugRotDegMax;
+    ac.scale_min     = kAugScaleMin;
+    ac.scale_max     = kAugScaleMax;
+    ac.shift_max     = kAugShiftMax;
+    ac.shear_x_max   = kAugShearXMax;
+    ac.shear_y_max   = kAugShearYMax;
+    ac.elastic_alpha = kAugElasticAlpha;
+    ac.elastic_sigma = kAugElasticSigma;
+    ac.noise_sigma   = kAugNoiseSigma;
+    ac.value_min     = -1.0f;
+    ac.value_max     = 1.0f;
+    ac.border_value  = kPad;
+    ac.enabled       = true;
+    return ac;
+}
+
+/// One report line; knobs drive the string so the log matches the live config.
+static void PrintAugReport()
+{
+    if (!kTrainAug)
+    {
+        std::printf("wtf_mnist: aug=off\n");
+        return;
+    }
+    // Keep format stable for scans / diffs.
+    std::printf(
+        "wtf_mnist: aug=rot+/-%g+scale[%g,%g]+shift+/-%d+shear_x+/-%g+"
+        "shear_y+/-%g+elastic(a=%g,s=%g)+N(0,%g)\n",
+        static_cast<double>(kAugRotDegMax),
+        static_cast<double>(kAugScaleMin),
+        static_cast<double>(kAugScaleMax),
+        kAugShiftMax,
+        static_cast<double>(kAugShearXMax),
+        static_cast<double>(kAugShearYMax),
+        static_cast<double>(kAugElasticAlpha),
+        static_cast<double>(kAugElasticSigma),
+        static_cast<double>(kAugNoiseSigma));
+}
+
+/// Test / unaugmented path: raw 28x28 → pack.
 static void PackSample(const wtf_ex::MnistSample& s,
                        std::span<float> field,
                        const hcnn::HCNNSpatialEmbedder& emb)
@@ -137,6 +210,33 @@ static void PackSample(const wtf_ex::MnistSample& s,
     if (static_cast<int>(s.pixels.size()) != kImgPixels)
         throw std::runtime_error("expected 28x28 MNIST sample");
     wtf_ex::PackMnist28(s.pixels.data(), emb, field);
+}
+
+/// Train collect path: optional aug on 28x28, then pack.
+/// Parallel-safe: thread_local 784 scratch; per-sample RNG (no shared engine).
+static void PackTrainSample(const wtf_ex::MnistSample& s,
+                            std::span<float> field,
+                            const hcnn::HCNNSpatialEmbedder& emb,
+                            const hcnn::HCNNSpatialAugmenter& aug,
+                            size_t sample_index)
+{
+    if (static_cast<int>(s.pixels.size()) != kImgPixels)
+        throw std::runtime_error("expected 28x28 MNIST sample");
+
+    const float* pixels = s.pixels.data();
+    if (kTrainAug && aug.config().enabled && !aug.config().is_identity())
+    {
+        // Geometry requires in != out; one scratch buffer per worker thread.
+        thread_local std::vector<float> scratch(static_cast<size_t>(kImgPixels));
+        if (scratch.size() != static_cast<size_t>(kImgPixels))
+            scratch.assign(static_cast<size_t>(kImgPixels), 0.0f);
+
+        std::mt19937 rng(kAugSeedBase
+                         + static_cast<unsigned>(sample_index) * 9973u);
+        aug.apply(s.pixels.data(), scratch.data(), kImgSide, kImgSide, rng);
+        pixels = scratch.data();
+    }
+    wtf_ex::PackMnist28(pixels, emb, field);
 }
 
 // =============================================================================
@@ -181,6 +281,9 @@ int main(int argc, char** argv)
             if (static_cast<size_t>(emb.capacity()) != wtf.N())
                 throw std::logic_error("embed capacity does not match WTF N");
 
+            // One augmenter for the run (const config; concurrent apply OK).
+            const hcnn::HCNNSpatialAugmenter train_aug(MakeTrainAugConfig());
+
             const auto plan = emb.plan(kImgSide, kImgSide);
             std::printf("wtf_mnist: pack=%s train=%zu test=%zu epochs=%d\n",
                         PackModeName(kPack), train.size(), test.size(),
@@ -200,6 +303,7 @@ int main(int argc, char** argv)
                             plan.pattern_length, plan.N,
                             plan.N - plan.pattern_length);
             }
+            PrintAugReport();
             std::fflush(stdout);
 
             auto t0 = std::chrono::steady_clock::now();
@@ -212,7 +316,7 @@ int main(int argc, char** argv)
             wtf.CollectEpisodes(
                 train.size(), train_labels,
                 [&](size_t i, std::span<float> out_field) {
-                    PackSample(train.samples[i], out_field, emb);
+                    PackTrainSample(train.samples[i], out_field, emb, train_aug, i);
                 });
             std::printf("Training readout on %zu episodes...\n", wtf.NumCollected());
             std::fflush(stdout);
@@ -224,17 +328,24 @@ int main(int argc, char** argv)
             size_t correct = 0;
             for (size_t i = 0; i < test.size(); ++i)
             {
-                PackSample(test.samples[i], field, emb);
+                PackSample(test.samples[i], field, emb); // never aug on test
                 if (wtf.PredictClass(field) == test.samples[i].label)
                     ++correct;
             }
+            auto t2 = std::chrono::steady_clock::now();
             const double test_acc =
                 static_cast<double>(correct) / static_cast<double>(test.size());
-            const double secs = std::chrono::duration<double>(t1 - t0).count();
+            const double secs_collect_train =
+                std::chrono::duration<double>(t1 - t0).count();
+            const double secs_test =
+                std::chrono::duration<double>(t2 - t1).count();
+            const double secs_total =
+                std::chrono::duration<double>(t2 - t0).count();
 
-            std::printf("wtf_mnist: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu) "
-                        "collect+train=%.1fs\n",
-                        acc_on_collected, test_acc, correct, test.size(), secs);
+            std::printf("wtf_mnist: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu)\n"
+                        "wtf_mnist: time %.1f+%.1f=%.1fs (collect+train|test|total)\n",
+                        acc_on_collected, test_acc, correct, test.size(),
+                        secs_collect_train, secs_test, secs_total);
             std::fflush(stdout);
 
             if (test_acc < kMinTestAcc)
