@@ -36,6 +36,19 @@ enum class PackMode
 // =============================================================================
 // WTF configuration — primary knobs for this demo (edit here)
 // =============================================================================
+//
+// BEST RUN SO FAR (record only — do not overwrite live knobs below):
+//   test_acc=0.968 (968/1000)  acc_on_collected=0.982  collect+train=164.8s
+//   dim=10 N=1024  M=1  T=32  B=1  ic_seed=12
+//   reservoir.seed=13871537636959942979  SR_target=0.95  (realized ~0.9507)
+//   input_scaling=0.015  leak=1  bias_scale=0.003 (default)
+//   pack=DualPlane  S=22 pattern=968 pad_tail=56
+//   train=60000  test=1000  epochs=40  batch_size=32  lr_max=0.001
+//   readout.seed=42  num_layers=1  conv_channels=16  activation=NONE
+//   restore_best_epoch=true  best_epoch_holdout_frac=0.1
+// Other seeds tried (weaker): 13769974450290969021 (0.964),
+//   6963774647319908809 (0.963), 5330595307729750981 (0.962).
+// =============================================================================
 
 static WTFConfig MakeWTFConfig()
 {
@@ -75,6 +88,7 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.num_threads             = 0; // 0 = HCNN auto
     cfg.readout.restore_best_epoch      = true;
     cfg.readout.momentum                = 0.9f; // SGD only; ignored by Adam
+    cfg.readout.optimizer               = ReadoutOptimizer::Adam;;  // TODO - try sdg...
     cfg.readout.best_epoch_holdout_frac = 0.1f; // tail of collected buffer only
 
     return cfg;
