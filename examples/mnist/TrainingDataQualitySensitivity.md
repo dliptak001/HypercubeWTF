@@ -219,23 +219,28 @@ reservoir.
 
 ## Appendix B — Tabulated logs
 
-### Held-out AWGN σ = 0.5, seed `0x7E57`
+Column conventions: **Training data** = clean vs corrupted training set;
+**Path** = Bypass or Reservoir; **collected** = accuracy on the clean training
+feature buffer; **held-out acc** = accuracy on the held-out set. Drops are in
+percentage points (pp).
+
+### Held-out AWGN σ = 0.5 (noise seed `0x7E57`)
 
 | Training data | Path | collected | held-out acc |
 |---------------|------|-----------|--------------|
-| Corrupted (aug on) | Reservoir | 0.970 | 0.843 |
-| Corrupted (aug on) | Bypass | 0.995 | 0.645 |
-| Clean (aug off) | Reservoir | 0.992 | 0.927 |
-| Clean (aug off) | Bypass | 0.998 | 0.830 |
+| Corrupted | Reservoir | 0.970 | 0.843 |
+| Corrupted | Bypass | 0.995 | 0.645 |
+| Clean | Reservoir | 0.992 | 0.927 |
+| Clean | Bypass | 0.998 | 0.830 |
 
-### Clean held-out set (no eval field noise)
+### Clean held-out set (no field noise)
 
 | Training data | Path | collected | held-out acc |
 |---------------|------|-----------|--------------|
-| Corrupted (aug on) | Reservoir | 0.970 | 0.969 |
-| Corrupted (aug on) | Bypass | 0.995 | 0.971 |
-| Clean (aug off) | Reservoir | 0.992 | 0.979 |
-| Clean (aug off) | Bypass | 0.999 | 0.978 |
+| Corrupted | Reservoir | 0.970 | 0.969 |
+| Corrupted | Bypass | 0.995 | 0.971 |
+| Clean | Reservoir | 0.992 | 0.979 |
+| Clean | Bypass | 0.999 | 0.978 |
 
 ### Sensitivity summary (held-out acc drop when the training data set is corrupted)
 

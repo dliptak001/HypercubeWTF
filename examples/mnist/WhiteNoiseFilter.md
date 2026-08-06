@@ -231,46 +231,55 @@ accuracy remained ~0.93. Factor under study: **bypass vs reservoir**.
 
 ## Appendix B — Tabulated logs
 
-### Strong AWGN (σ = 0.5)
+Column conventions: **Path** = Bypass or Reservoir; **collected** = accuracy on
+the clean training feature buffer; **held-out acc** = accuracy on the held-out
+set. Δ is reservoir − bypass in percentage points (pp).
 
-**Bypass vs reservoir (three noise seeds):**
+### Held-out AWGN σ = 0.5 (three noise seeds)
 
-| seed_base | Bypass test_acc | Reservoir test_acc | Δ |
-|-----------|-----------------|--------------------|---|
-| `0x7E57` | 0.847 | 0.929 | +8.2 pp |
-| `0x3E57` | 0.846 | 0.931 | +8.5 pp |
-| `0x1E57` | 0.844 | 0.931 | +8.7 pp |
+| Noise seed | Path | collected | held-out acc | Δ (vs bypass) |
+|------------|------|-----------|--------------|---------------|
+| `0x7E57` | Bypass | — | 0.847 | |
+| `0x7E57` | Reservoir | ≈0.978 | 0.929 | +8.2 pp |
+| `0x3E57` | Bypass | — | 0.846 | |
+| `0x3E57` | Reservoir | ≈0.978 | 0.931 | +8.5 pp |
+| `0x1E57` | Bypass | — | 0.844 | |
+| `0x1E57` | Reservoir | ≈0.978 | 0.931 | +8.7 pp |
 
-Reservoir collected ≈ 0.978 on those runs.
+Collected was logged once as ≈0.978 for the reservoir rows above (same recipe
+family).
 
-**Additional reservoir seeds (σ = 0.5):**
+### Held-out AWGN σ = 0.5 (additional reservoir-only seeds)
 
-| seed_base | collected | test_acc |
-|-----------|-----------|----------|
-| `0x1E57` | 0.992 | 0.930 |
-| `0x7E57` | 0.992 | 0.927 |
+Minor readout variants of the same recipe family; bypass not re-run in this
+block.
 
-### Mild AWGN (σ = 0.1, seed `0x1E57`)
+| Noise seed | Path | collected | held-out acc |
+|------------|------|-----------|--------------|
+| `0x1E57` | Reservoir | 0.992 | 0.930 |
+| `0x7E57` | Reservoir | 0.992 | 0.927 |
 
-| Arm | collected | test_acc |
-|-----|-----------|----------|
+### Held-out AWGN σ = 0.1 (noise seed `0x1E57`)
+
+| Path | collected | held-out acc |
+|------|-----------|--------------|
 | Reservoir | 0.978 | 0.968 |
 | Bypass | 0.999 | 0.980 |
 
-### Clean (σ = 0)
+### Clean held-out set (no field noise)
 
-| Arm | collected | test_acc |
-|-----|-----------|----------|
+| Path | collected | held-out acc |
+|------|-----------|--------------|
 | Bypass | 0.999 | 0.979 |
 | Reservoir | 0.992 | 0.979 |
 
 (Other reservoir clean logs: 0.970–0.977 depending on minor readout settings;
 all near bypass.)
 
-### Cross-σ snapshot
+### Cross-σ snapshot (held-out accuracy)
 
-| Test noise | Bypass | Reservoir |
-|------------|--------|-----------|
+| Held-out noise | Bypass | Reservoir |
+|----------------|--------|-----------|
 | off | ~0.979 | ~0.979 |
-| N(0, 0.1) | **0.980** | 0.968 |
-| N(0, 0.5) multi-seed | ~0.84–0.85 | **~0.93** |
+| σ = 0.1 | **0.980** | 0.968 |
+| σ = 0.5 (multi-seed) | ~0.84–0.85 | **~0.93** |
