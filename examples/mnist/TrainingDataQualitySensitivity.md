@@ -100,24 +100,24 @@ equally sensitive** (small, similar drops).
 ## What “training data quality” means in this study
 
 **Spatial augmentation is not product-ready here.** Ideal aug should improve
-generalization; the augmentation module **hurts** every arm relative to a clean
-training set — at least at the dim-10 / MNIST packing used in this survey. Until
-that is resolved, **do not treat spatial aug as a recommended training path**,
-even though `HCNNSpatialAug` is exposed in the C++ / Python SDKs.
+generalization; however, the augmentation module **hurts** every arm relative to
+a clean training set — at least at the dim-10 / MNIST packing used in this
+survey. Until that is resolved, **do not treat spatial aug as a recommended
+training path**, even though `HCNNSpatialAug` is exposed in the C++ / Python
+SDKs.
 
 Serendipitously, for **this** study that same buggy / failing training
 augmentation module can be used deliberately as a **training-set corruptor**:
 systematic geometric and mild pixel noise on 28×28 **before** pack, applied only
-when building the training data set.
+when building the training data set. **Held-out images** are never run through
+that spatial-aug corruptor.
 
 ```text
-Clean training set     — aug off; packed fields from raw digits
-Corrupted training set — spatial aug on (rot/scale/shift/shear + N(0,0.03)
-                         on the image); then pack → features → train HCNN
+Clean training set     — aug off; pack raw digits → features → train HCNN
+Corrupted training set — aug on (rot/scale/shift/shear + N(0,0.03) on the image); pack corrupt digits → features → train HCNN
 ```
 
-The **held-out data set** is never geometrically augmented / corrupted.
-
+Crossing clean vs corrupted training sets with clean vs AWGN held-out fields is the rest of the design.
 
 ---
 
