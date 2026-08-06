@@ -1,12 +1,10 @@
 # HypercubeWTF C++ SDK
 
-You choose a cube dimension **dim** (an integer from 5 to 16). That fixes the
-field length **N = 2<sup>dim</sup>** — for example dim 7 → N = 128, dim 10 →
-N = 1024. You place a fixed pattern on those N vertices (an image pack, a
-spectrum, or any length-N floats you built yourself). HypercubeWTF **drives
-that field through a frozen reservoir** for a short synthetic orbit, then
-**trains a small CNN only on the state at the end**. One class does the whole
-loop: collect episodes, train the head, predict.
+You place a fixed pattern on the hypercube — an image pack, a spectrum, or any
+field you built yourself. HypercubeWTF **drives that field through a frozen
+reservoir** for a short synthetic orbit, then **trains a small CNN only on the
+state at the end**. One class does the whole loop: collect episodes, train the
+head, predict.
 
 You do not need to learn HypercubeESN or HypercubeCNN first. Link
 **`HypercubeWTFCore`**, include **`WTF.h`** (or **`HypercubeWTF.h`**), and work
@@ -56,6 +54,11 @@ acting as an identity transformation when noise is not present, and reducing
 sensitivity to training data quality when noise is present. For the details, see
 [WhiteNoiseFilter.md](../examples/mnist/WhiteNoiseFilter.md) and
 [TrainingDataQualitySensitivity.md](../examples/mnist/TrainingDataQualitySensitivity.md).
+
+HypercubeWTF is yet another experiment in the HypercubeAI project — our quest to
+map AI and ML strategies onto the hypercube as a shared computational substrate.
+Each product in the family is a different architecture on that same foundation;
+this one is the dynamical-encoder path for static fields.
 
 Whether this dynamical encoding → CNN pipeline has real product value is still
 an open question. We are exploring it as a new technique on static fields — and
