@@ -25,9 +25,9 @@ MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remain
 
 **Train-only spatial aug** (vendored `HCNNSpatialAugmenter`): optional 2D geometry + noise on 28×28 **before** pack. Collect-once freezes one aug draw per sample.
 
-**Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.input_noise_sigma` (collect-only).
+**Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.train_input_noise_sigma` (train/collect-only).
 
-**Test noise × bypass vs orbit:** see [`mnist/RESULTS_test_noise_bypass.md`](mnist/RESULTS_test_noise_bypass.md) — at σ=0.5 orbit ~0.93 vs bypass ~0.85 (3 seeds); at σ=0.1 / clean, bypass slightly better.
+**Evaluation (hypercube reservoir as white-noise filter):** see [`mnist/Evaluation.md`](mnist/Evaluation.md) — same frozen-reservoir discipline as HypercubeESN, used as a static-field preprocessor; at σ=0.5 reservoir ~0.93 vs bypass ~0.85; clean accuracy comparable.
 
 ## Binaries
 

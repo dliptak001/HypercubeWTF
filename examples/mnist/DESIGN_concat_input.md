@@ -81,7 +81,7 @@ When `concat_input == false`: unchanged (FeatureSize = B*N).
 Mutually exclusive with `concat_input`.  
 Bypass already is “field only”; doubling as `[x|x]` is useless. Construct-time error if both true.
 
-### 4.2 `input_noise_sigma` (collect-only)
+### 4.2 `train_input_noise_sigma` (train/collect-only)
 
 Noise is applied to the field **before** the orbit.  
 Block 2 should be that **same** post-noise field (the actual drive), not a clean copy.  

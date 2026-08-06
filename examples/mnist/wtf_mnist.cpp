@@ -9,7 +9,7 @@
 /// Train collect only: optional HCNNSpatialAug on 28x28, then pack.
 /// Test is never geometrically augmented. Optional demo-only i.i.d. Gaussian on
 /// the packed test field (kTestNoiseSigma) is an eval protocol — not WTF core
-/// and not episode.input_noise_sigma (collect-only). Prefer one noise source at
+/// and not episode.train_input_noise_sigma (collect-only). Prefer one noise source at
 /// a time when comparing (leave collect/aug noise at 0 for clean test-noise A/B).
 ///
 /// Data: this repo's data/ (discovered via cwd / exe / source tree).
@@ -67,32 +67,22 @@ static const char* PackModeName(PackMode pack)
 // WTF configuration — primary knobs for this demo (edit here)
 // =============================================================================
 //
-// BEST RUN SO FAR (record only — do not overwrite live knobs below):
-//   test_acc=0.975 (9754/10000)  acc_on_collected=0.995  collect+train=157.2s
-//   dim=10 N=1024  M=1  T=32  B=1  ic_seed=12
-//   reservoir.seed=13871537636959942979  SR_target=0.95  (realized ~0.9507)
-//   input_scaling=0.015  leak=1  bias_scale=0.003
-//   pack=PadLowCenter  full=28x28@ [0,784)  center=15x16@(6,6) -> [784,1024)
-//   train=60000  test=10000  epochs=40  batch_size=32  lr_max=0.0015
-//   readout.seed=42  num_layers=1  conv_channels=16  pooling=max  activation=NONE
-//   restore_best_epoch=true  best_epoch_holdout_frac=0.1
-// Same knobs PadLow control: test_acc=0.966 (9659/10000) acc_on_collected=0.982
-// =============================================================================
-
-// =============================================================================
+// Live MakeWTFConfig() snapshot (keep this comment in sync when you edit below):
+//   reservoir: dim=10 N=1024  M=4  seed=13871537636959942979
+//              SR_target=0.4  leak=0.5  in_scale=0.005  bias_scale=0
+//   episode:   T=20  B=1  ic_seed=12  train_input_noise_sigma=0  bypass_reservoir=false
+//   readout:   seed=42  dim=0(auto)  num_outputs=10  num_layers=1  channel_growth=1
+//              pooling=max  conv_channels=16  activation=NONE  task=classification
+//              epochs=100  batch_size=64  lr_max=0.0015  lr_min_frac=0.01
+//              lr_decay_epochs=0  weight_decay=0  num_threads=0(auto)
+//              restore_best_epoch=true  optimizer=Adam  best_epoch_holdout_frac=0.1
 //
-// BEST RUN SO FAR FOR HIGH NOISE RESISTANCE:
-// wtf_mnist: N=1024 T=20 B=1 M=4 ic_seed=12 collect_threads=0 (auto: leave 1-2 cores free) input_noise_sigma=0 bypass_reservoir=false
-// reservoir: dim=10 N=1024 M=4 seed=13871537636959942979 SR_target=0.4 leak=1 in_scale=0.005 bias_scale=0 SR_realized=0.398801
-// readout: layers=1 weights=82122 pooling=max activation=leaky_relu lr_max=0.0015
-// wtf_mnist: pack=PadLowCenter train=60000 test=10000 epochs=40
-// wtf_mnist: PadLowCenter full=28x28@ [0,784) center=15x16@(6,6) pattern=1024 N=1024
-// wtf_mnist: aug=off
-// wtf_mnist: test_noise=off
-// Collecting 60000 episodes (parallel)...
-// Training readout on 60000 episodes...
-// wtf_mnist: acc_on_collected=0.978 test_acc=0.970 (9701/10000)
-// wtf_mnist: time 112.6+8.4=120.9s (collect+train|test|total)
+// Demo pack / noise (outside WTFConfig; see k* below): pack=PadLowCenter,
+//   train=60000 test=10000, aug=off, kTestNoiseSigma / kTestNoiseSeedBase.
+//
+// Measured bypass vs reservoir (see examples/mnist/Evaluation.md):
+//   clean: reservoir ≈ bypass (test_acc≈0.979)
+//   AWGN σ=0.5 on packed field (multi-seed): reservoir≈0.93 vs bypass≈0.85
 // =============================================================================
 
 static WTFConfig MakeWTFConfig()
@@ -103,21 +93,22 @@ static WTFConfig MakeWTFConfig()
     cfg.reservoir.dim           = 10; // N = 1024; PadLow/PadLowCenter need dim >= 10
     cfg.reservoir.history_depth = 4;
     cfg.reservoir.seed          = 13871537636959942979ull;
-    cfg.reservoir.spectral_radius = 0.4; //0.4-acc_on_collected=0.978 test_acc=0.929; 0.6-acc_on_collected=0.986 test_acc=0.922; 0.7-acc_on_collected=0.986 test_acc=0.921; 0.95-acc_on_collected=0.978 test_acc=0.912
+    cfg.reservoir.spectral_radius = 0.4;
     cfg.reservoir.input_scaling = 0.005;
-    cfg.reservoir.bias_scaling  = 0.0; //0.003;
+    cfg.reservoir.leak_rate  = 0.5;
+    cfg.reservoir.bias_scaling  = 0.0;
     cfg.reservoir.verbose       = false;
 
     // Episode IC (separate from weight seed)
     cfg.ic_seed = 12;
 
     // Episode: T = 0 means default T = N
-    cfg.episode.T              = 20;//32;
+    cfg.episode.T              = 20;
     cfg.episode.readout_slices = 1;
     // Keep 0 when train aug N(0,σ) is on — do not stack two noise sources.
-    cfg.episode.input_noise_sigma = 0.0f;
+    cfg.episode.train_input_noise_sigma = 0.0f;
     // true = pack field → readout (no orbit); PackMode still applies. Needs B=1.
-    cfg.episode.bypass_reservoir  = false;
+    cfg.episode.bypass_reservoir  = true;
 
     // Readout (trainable HCNN)
     cfg.readout.seed                    = 42;
@@ -129,7 +120,7 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.conv_channels           = 16;
     cfg.readout.activation              = ReadoutActivation::NONE;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.epochs                  = 85;
+    cfg.readout.epochs                  = 100; //100 for orbit; 20 for bypass;
     cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;
@@ -173,10 +164,10 @@ static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
 
 // Test-only protocol: N(0,σ) on the packed length-N field after PackSample,
 // before PredictClass. 0 = off (default). Independent of train aug and of
-// episode.input_noise_sigma. Deterministic per sample from kTestNoiseSeedBase.
+// episode.train_input_noise_sigma. Deterministic per sample from kTestNoiseSeedBase.
 // High-noise bypass A/B: try σ in ~0.3–0.5 on [-1,1]-ish packed fields.
 static constexpr float    kTestNoiseSigma    = 0.0f;
-static constexpr unsigned kTestNoiseSeedBase = 0x1E57u; //0x7E57u;
+static constexpr unsigned kTestNoiseSeedBase = 0x7E57u; //0x7E57u;
 
 // =============================================================================
 // Helpers

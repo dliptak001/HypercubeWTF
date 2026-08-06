@@ -350,27 +350,27 @@ int main()
             cfg.readout.epochs = 1;
             cfg.readout.num_threads = 1;
             cfg.episode.collect_threads = 1;
-            cfg.episode.input_noise_sigma = 0.05f;
+            cfg.episode.train_input_noise_sigma = 0.05f;
 
             auto x = MakeField(32, 0);
             WTF noisy(cfg);
             noisy.CollectEpisode(x, 0);
             noisy.RunEpisode(x);
 
-            cfg.episode.input_noise_sigma = 0.0f;
+            cfg.episode.train_input_noise_sigma = 0.0f;
             WTF clean(cfg);
             clean.RunEpisode(x);
             if (!Near(noisy.LastFeatures(), clean.LastFeatures()))
             {
-                std::fprintf(stderr, "input_noise: RunEpisode must ignore σ\n");
+                std::fprintf(stderr, "train_input_noise: RunEpisode must ignore σ\n");
                 return 1;
             }
             if (noisy.NumCollected() != 1)
             {
-                std::fprintf(stderr, "input_noise: collect count\n");
+                std::fprintf(stderr, "train_input_noise: collect count\n");
                 return 1;
             }
-            std::printf("wtf_smoke: ok input_noise_sigma path\n");
+            std::printf("wtf_smoke: ok train_input_noise_sigma path\n");
         }
 
         // ----- bypass_reservoir: field is features; collect+train still works -----

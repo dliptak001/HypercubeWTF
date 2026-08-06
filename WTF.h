@@ -31,16 +31,17 @@ struct EpisodeConfig
     /// lifetime so bulk collects do not re-spawn OS threads each call.
     size_t collect_threads = 0;
 
-    /// Collect-only i.i.d. Gaussian noise on the length-N field before the
-    /// episode (σ of N(0,σ) per vertex). 0 = off (default; zero cost on collect).
+    /// Train/collect-only i.i.d. Gaussian noise on the length-N field before
+    /// the episode (σ of N(0,σ) per vertex). 0 = off (default; zero cost).
     /// Applied on @ref CollectEpisode / @ref CollectEpisodes only — not on
     /// @ref RunEpisode / @ref Predict / @ref PredictClass. Fresh draw every
     /// collected sample (deterministic from ic_seed + sample index).
-    float input_noise_sigma = 0.0f;
+    /// Name stresses train path: this is not test/eval noise (see demo knobs).
+    float train_input_noise_sigma = 0.0f;
 
     /// If true, skip the reservoir orbit: readout features are the length-N
     /// packed field itself (host packing / PackMode still applies). Requires
-    /// readout_slices B == 1. Collect noise still applies when σ > 0.
+    /// readout_slices B == 1. Train input noise still applies when σ > 0.
     bool bypass_reservoir = false;
 };
 
@@ -156,7 +157,7 @@ private:
         std::unique_ptr<Reservoir> owned; // null for primary alias
         std::vector<float> drive;         // length N; empty if using drive_
         std::vector<float> field;         // length N pack scratch
-        std::vector<float> noise;         // length N if input_noise_sigma_ > 0
+        std::vector<float> noise;         // length N if train_input_noise_sigma_ > 0
         float* drive_ptr = nullptr;       // → drive_ or drive.data()
     };
 
@@ -189,7 +190,7 @@ private:
     size_t B_ = 1;
     uint64_t ic_seed_ = 0;
     size_t collect_threads_pref_ = 0; // raw config (0 = auto)
-    float input_noise_sigma_ = 0.0f;  // collect-only; 0 = off
+    float train_input_noise_sigma_ = 0.0f;  // train/collect-only; 0 = off
     bool bypass_reservoir_ = false;   // field → features, no orbit
 
     std::unique_ptr<Reservoir> reservoir_;

@@ -187,7 +187,7 @@ private:
 WTF::WTF(const WTFConfig& cfg)
     : ic_seed_(cfg.ic_seed),
       collect_threads_pref_(cfg.episode.collect_threads),
-      input_noise_sigma_(cfg.episode.input_noise_sigma),
+      train_input_noise_sigma_(cfg.episode.train_input_noise_sigma),
       bypass_reservoir_(cfg.episode.bypass_reservoir),
       readout_cfg_(cfg.readout),
       reservoir_cfg_(cfg.reservoir)
@@ -200,9 +200,9 @@ WTF::WTF(const WTFConfig& cfg)
     if (T_ == 0)
         throw std::invalid_argument("WTF: episode T must be > 0");
 
-    if (!(input_noise_sigma_ >= 0.0f) || !std::isfinite(input_noise_sigma_))
+    if (!(train_input_noise_sigma_ >= 0.0f) || !std::isfinite(train_input_noise_sigma_))
         throw std::invalid_argument(
-            "WTF: episode.input_noise_sigma must be finite and >= 0");
+            "WTF: episode.train_input_noise_sigma must be finite and >= 0");
 
     B_ = cfg.episode.readout_slices;
     if (B_ == 0 || (B_ & (B_ - 1)) != 0)
@@ -245,7 +245,7 @@ WTF::WTF(const WTFConfig& cfg)
     primary.res = reservoir_.get();
     primary.drive_ptr = drive_.data();
     primary.field.assign(n_, 0.0f);
-    if (input_noise_sigma_ > 0.0f)
+    if (train_input_noise_sigma_ > 0.0f)
         primary.noise.assign(n_, 0.0f);
     collect_workers_.push_back(std::move(primary));
 }
@@ -330,11 +330,11 @@ void WTF::RequireRegression() const
 void WTF::AppendFeatures(std::span<const float> x)
 {
     // Collect-only noise: Predict/RunEpisode paths never enter here.
-    if (input_noise_sigma_ > 0.0f)
+    if (train_input_noise_sigma_ > 0.0f)
     {
         if (noise_field_.size() != n_)
             noise_field_.assign(n_, 0.0f);
-        add_gaussian_noise(x.data(), noise_field_.data(), n_, input_noise_sigma_,
+        add_gaussian_noise(x.data(), noise_field_.data(), n_, train_input_noise_sigma_,
                            mix64(ic_seed_ ^ (0x4E4F495300000001ULL + num_collected_)));
         RunEpisode(noise_field_);
     }
@@ -423,7 +423,7 @@ void WTF::EnsureCollectWorkers(size_t n)
             w.drive.assign(n_, 0.0f);
             w.drive_ptr = w.drive.data();
             w.field.assign(n_, 0.0f);
-            if (input_noise_sigma_ > 0.0f)
+            if (train_input_noise_sigma_ > 0.0f)
                 w.noise.assign(n_, 0.0f);
             fresh[k] = std::move(w);
         }
@@ -488,7 +488,7 @@ void WTF::CollectFeaturesParallel(
     EnsureCollectPool(nw);
 
     // Hoist flags out of the sample loop (predictable; off is the common path).
-    const float sigma = input_noise_sigma_;
+    const float sigma = train_input_noise_sigma_;
     const bool do_noise = (sigma > 0.0f);
     const bool bypass = bypass_reservoir_;
 
