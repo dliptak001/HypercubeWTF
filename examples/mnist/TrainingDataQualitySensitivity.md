@@ -3,7 +3,7 @@
 ## The HypercubeAI substrate
 
 HypercubeWTF sits in the same family as **HypercubeESN** and **HypercubeCNN**:
-computation lives on a **hypercube** of `N = 2^dim` vertices. Neighbors, gathers,
+computation lives on a **hypercube** of *N* = 2<sup>dim</sup> vertices. Neighbors, gathers,
 and spatial structure are cube-native — not a generic dense RNN with the graph
 painted on afterward.
 
@@ -52,16 +52,17 @@ hands the end state to HypercubeCNN.
 
 ### Bypass vs reservoir (the A/B)
 
+Both arms start the same way: **pack** maps the input onto the hypercube field.
+The A/B is only what becomes the HypercubeCNN feature vector:
+
 ```text
-Pack        — map the input onto the hypercube field
-Bypass      — features = packed field (reservoir unused)
-Reservoir   — features = end state of a short frozen reservoir episode
+Bypass    — packed field (reservoir unused)
+Reservoir — end state of a short frozen reservoir episode
 ```
 
-In code, that switch is `episode.bypass_reservoir`. **Bypass** asks: is the
-hypercube pack + HypercubeCNN enough? **Reservoir** asks: does a short frozen
-episode on the same cube change how hard a **degraded training data set** hits
-held-out accuracy?
+**Bypass** asks: is the hypercube pack + HypercubeCNN enough? **Reservoir** asks:
+does a short frozen episode on the same cube change how hard a **degraded
+training data set** hits held-out accuracy?
 
 This evaluation asks only:
 
@@ -69,8 +70,8 @@ This evaluation asks only:
 on each path — and is the reservoir less sensitive than bypass?**
 
 Sensitivity is measured under two **held-out** regimes (clean fields vs strong
-AWGN on the packed field) so the training-data effect is not confounded with a
-single evaluation condition.
+**additive white Gaussian noise (AWGN)** on the packed field) so the
+training-data effect is not confounded with a single evaluation condition.
 
 **MNIST is only the evaluation vehicle** — a lightweight, familiar, convenient
 data set with a standard training/held-out split, not a product claim about
@@ -103,18 +104,17 @@ equally sensitive** (small, similar drops).
 generalization; however, the augmentation module **hurts** every arm relative to
 a clean training set — at least at the dim-10 / MNIST packing used in this
 survey. Until that is resolved, **do not treat spatial aug as a recommended
-training path**, even though `HCNNSpatialAug` is exposed in the C++ / Python
-SDKs.
+training path**, even though it remains available in the C++ / Python SDKs.
 
 Serendipitously, for **this** study that same buggy / failing training
 augmentation module can be used deliberately as a **training-set corruptor**:
-systematic geometric and mild pixel noise on 28×28 **before** pack, applied only
-when building the training data set. **Held-out images** are never run through
-that spatial-aug corruptor.
+systematic geometric and mild pixel noise on the image **before** pack, applied
+only when building the training data set. **Held-out images** are never run
+through that spatial-aug corruptor.
 
 ```text
-Clean training set     — aug off; pack raw digits → features → train HCNN
-Corrupted training set — aug on (rot/scale/shift/shear + N(0,0.03) on the image); pack corrupt digits → features → train HCNN
+Clean training set     — augmentation off; pack raw digits → features → train HCNN
+Corrupted training set — augmentation on; pack corrupted digits → features → train HCNN
 ```
 
 Crossing clean vs corrupted training sets with clean vs AWGN held-out fields is the rest of the design.
@@ -170,8 +170,7 @@ corrupted training set   parity (small tax)   reservoir much more tolerant
 
 - That the logged spatial-aug recipe is good augmentation or a recommended
   training path (it is used here only as a **corruptor** of the training data
-  set; dim-10 results do not endorse using the exposed `HCNNSpatialAug` API that
-  way).
+  set; dim-10 results do not endorse using the SDK spatial-aug facility that way).
 - Multi-seed coverage of every cell (one noise seed).
 - Other training-set corruptors (e.g. matched AWGN on the training set), other
   datasets, or a full recipe sweep.

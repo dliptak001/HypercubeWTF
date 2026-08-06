@@ -12,6 +12,9 @@ Vendored / forked sources: [`VENDORED.md`](VENDORED.md)
 
 **Status:** Phase 4 — demos (`wtf_synth`, `wtf_mnist`) + collect/train/predict core.
 
+
+TODO:  Acknowledge that a more rigorous study needs to be performed to firmly establish the claims made.
+
 ## Build (CLion)
 
 Open the project in CLion and reload CMake. Prefer **Release**. Or, with the

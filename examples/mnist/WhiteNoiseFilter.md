@@ -3,7 +3,7 @@
 ## The HypercubeAI substrate
 
 HypercubeWTF sits in the same family as **HypercubeESN** and **HypercubeCNN**:
-computation lives on a **hypercube** of `N = 2^dim` vertices. Neighbors, gathers,
+computation lives on a **hypercube** of *N* = 2<sup>dim</sup> vertices. Neighbors, gathers,
 and spatial structure are cube-native — not a generic dense RNN with the graph
 painted on afterward.
 
@@ -43,7 +43,7 @@ episode** does to a static field before HypercubeCNN.
 | Time | Stream time = model time | **Synthetic episode time** inside one sample |
 | Drive | New input each step | Same field re-presented each step of the episode |
 | Features | State along the stream | **End-of-episode** reservoir state |
-| Product emphasis here | Temporal modeling of sequences | **Optional pre-filter** for HypercubeCNN under AWGN |
+| Product emphasis here | Temporal modeling of sequences | **Optional pre-filter** for HypercubeCNN under additive white Gaussian noise (AWGN) |
 
 Same RC contract (frozen cube reservoir + trained head). Different **use**: ESN
 follows a stream; WTF drives a static hypercube field through a short episode and
@@ -51,16 +51,17 @@ hands the end state to HypercubeCNN.
 
 ### Bypass vs reservoir (the A/B)
 
+Both arms start the same way: **pack** maps the input onto the hypercube field.
+The A/B is only what becomes the HypercubeCNN feature vector:
+
 ```text
-Pack        — map the input onto the hypercube field
-Bypass      — features = packed field (reservoir unused)
-Reservoir   — features = end state of a short frozen reservoir episode
+Bypass    — packed field (reservoir unused)
+Reservoir — end state of a short frozen reservoir episode
 ```
 
-In code, that switch is `episode.bypass_reservoir`. **Bypass** asks: is the
-hypercube pack + HypercubeCNN enough? **Reservoir** asks: does a short frozen
-episode on the same cube improve the features — especially when the pack is
-corrupted?
+**Bypass** asks: is the hypercube pack + HypercubeCNN enough? **Reservoir** asks:
+does a short frozen episode on the same cube improve the features — especially
+when the pack is corrupted?
 
 On clean MNIST the reservoir is easy to treat as optional: pack and readout
 already do most of the work. Under strong **additive white Gaussian noise
@@ -93,15 +94,16 @@ noise seeds. That is the product-relevant result.
 
 ## Protocol
 
-The **only** intentional factor in the headline A/B is reservoir **on vs off**
-(`bypass_reservoir`). Within each noise condition, packing, train set, readout,
-and (when matched) noise seed are shared. The reservoir arm uses one fixed recipe
-(appendix). Bypass ignores reservoir dynamics; the hypercube still appears in
-**packing** the field onto the cube.
+The **only** intentional factor in the headline A/B is reservoir **on vs off**.
+Within each noise condition, packing, training set, readout, and (when matched)
+noise seed are shared. The reservoir arm uses one fixed recipe (appendix).
+Bypass ignores reservoir dynamics; the hypercube still appears in **packing**
+the field onto the cube.
 
-**Test noise** is i.i.d. Gaussian on every packed vertex after pack and before
-predict — flat spectrum, Gaussian amplitudes, additive (demo eval protocol). It is
-not train/collect field noise and not geometric augmentation.
+**Held-out noise** is i.i.d. Gaussian on every packed vertex after pack and
+before prediction — flat spectrum, Gaussian amplitudes, additive (evaluation
+protocol only). It is not training-set field noise and not geometric
+augmentation.
 
 **Train** stays clean. The head learns on clean features and is scored on clean
 or corrupted test fields — a domain-shift stress test, not matched noisy training.
