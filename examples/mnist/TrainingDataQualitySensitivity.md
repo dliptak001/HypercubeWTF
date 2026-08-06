@@ -79,6 +79,14 @@ digits or vision. The pipeline under study is pack → optional hypercube
 reservoir → HypercubeCNN on a length-N field; any static field that packs onto
 the cube is in scope for the same idea.
 
+**Held-out accuracy here is not a ceiling on the substrate.** These studies use a
+**dim = 10** hypercube (*N* = 1024) so campaigns stay fast to iterate. That is a
+deliberate study choice, not a statement of product accuracy. **HypercubeCNN has
+already demonstrated ~99.5% on MNIST**; the HypercubeWTF MNIST example does not
+try to re-prove that number. The interesting deltas are **relative** (how each
+path moves when the training data set is degraded), not absolute MNIST
+leaderboard scores.
+
 ---
 
 ## The claim
