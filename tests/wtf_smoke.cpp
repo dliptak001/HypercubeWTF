@@ -10,7 +10,7 @@
 ///   6) bypass_reservoir field → features (+ B must be 1)
 ///
 /// Fail = exit 1 + stderr; success = a few "ok ..." lines on stdout.
-/// Charter: docs/project.md (§4 episode). Sibling demos: wtf_synth, wtf_mnist.
+/// Episode contracts: docs/CPP_SDK.md. Sibling demos: wtf_synth, wtf_mnist.
 
 #include "WTF.h"
 
@@ -87,7 +87,7 @@ int main()
 {
     try
     {
-        // ----- Episode contract (docs/project.md §4) -----
+        // ----- Episode contract (docs/CPP_SDK.md) -----
         {
             WTF wtf(MakeCfg());
             if (wtf.N() != kSmokeN || wtf.T() != wtf.N() || wtf.B() != 1 || wtf.M() != 4

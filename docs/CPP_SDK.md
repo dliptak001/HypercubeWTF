@@ -7,13 +7,11 @@ state at the end**. One class does the whole loop: collect episodes, train the
 head, predict.
 
 You do not need to learn HypercubeESN or HypercubeCNN first. Link
-**`HypercubeWTFCore`**, include **`WTF.h`** (or **`HypercubeWTF.h`**), and work
-with **`WTF`**. Demos and packing helpers are optional recipes; they are not the
-product.
+**`HypercubeWTFCore`**, include **`WTF.h`**, and work with **`WTF`**. Demos and
+packing helpers are optional recipes; they are not the product.
 
 This guide matches the public headers for **0.1.x**. The library is still early:
-APIs and defaults can move. For goals and locked design choices, see
-**[project.md](project.md)**.
+APIs and defaults can move.
 
 **Who it is for:** anyone embedding WTF in a host (collect → train → predict),
 and anyone learning the stack with the same API the demos use.
@@ -102,6 +100,27 @@ skip them when you pack your own way.
 | Starting state **s0** (full delay line) | No — drawn once from `ic_seed`, reloaded every episode |
 | How you pack domain data into the field | Your problem (outside WTF) |
 | HCNN readout | **Yes** |
+
+### Episode start state (**s0**)
+
+Every episode begins by reloading the **same** frozen initial condition into the
+full delay line, then setting the pass counter `c` to 0. That way two runs of
+the same field (same config) are deterministic, and you never inherit residual
+state from the previous sample.
+
+| Rule | Behavior |
+|------|----------|
+| Size | **`N × M`** floats — one full delay-line worth of state |
+| When drawn | **Once**, at `WTF` construction |
+| Seed | **`ic_seed`** — separate from `reservoir.seed` (weights) |
+| Distribution | i.i.d. uniform on **[-0.5, 0.5]** over the whole buffer |
+| After construct | Immutable for the life of that `WTF` |
+| Each episode | Reload into the live delay line (age-correct load, not a blind mid-rotation overwrite) |
+| Pass counter | `c = 0` at episode start |
+
+If you change only `ic_seed`, weights stay the same but the end features change
+(different orbit start). If you change only `reservoir.seed`, the frozen graph
+weights change.
 
 ---
 
@@ -214,7 +233,7 @@ x  (length N, fixed for this episode)
 | **T** | How many drive passes (`episode.T = 0` means “use N”) |
 | **B** | How many end delay-line ages go into the feature vector (`readout_slices`) |
 | **M** | Delay-line depth (`history_depth`) |
-| **s0** | Frozen start state, length `N × M`, from `ic_seed` (not the weight seed) |
+| **s0** | Frozen start state, length `N × M`, U[-0.5, 0.5] from `ic_seed` (not the weight seed); reloaded every episode |
 | **FeatureSize** | `B × N` — what the readout eats |
 
 `B` must be a power of two and no larger than `M`. Default is `B = 1` (newest
@@ -233,7 +252,6 @@ slice only).
 | Raw HypercubeCNN | Almost never — that lives under the readout |
 
 ```text
-HypercubeWTF.h     umbrella → WTF.h
 WTF.h              front door (WTF, WTFConfig, EpisodeConfig)
 Reservoir.h        ReservoirConfig (+ Reservoir for inspection)
 Readout.h          ReadoutConfig, enums, Readout
@@ -241,7 +259,6 @@ Readout.h          ReadoutConfig, enums, Readout
 third_party/HypercubeCNN/    vendored; see VENDORED.md
 examples/                    demos, not the SDK definition
 docs/CPP_SDK.md              this guide
-docs/project.md              charter
 ```
 
 Link **`HypercubeWTFCore`** (it pulls **`HypercubeCNNCore`** for you).
@@ -253,7 +270,8 @@ These are product contracts, not implementation trivia.
 - **Every field is length N.** Wrong size throws.
 - **Values are usually kept in [-1, 1].** The library trusts the host; it does not clamp.
 - **You pack; WTF drives.** No built-in image layout.
-- **Reservoir and s0 freeze at construct.** Every episode reloads the same s0.
+- **Reservoir and s0 freeze at construct.** s0 is length `N × M`, drawn once
+  from `ic_seed` (U[-0.5, 0.5]); every episode reloads that same buffer.
 - **Only the end state** goes to the readout (optional multi-age pack `B`).
 - **Train noise is collect-only.** `Predict` / `RunEpisode` stay clean.
 - **`Predict` returns raw logits** (or regression values) — no softmax.
@@ -309,7 +327,7 @@ target_include_directories(my_app PRIVATE path/to/HypercubeWTF)
 ```
 
 ```cpp
-#include "HypercubeWTF.h"   // or "WTF.h"
+#include "WTF.h"
 ```
 
 ---
@@ -320,7 +338,7 @@ A tiny two-class example — collect, train, predict. (Verified against the
 library: trains and predicts correctly on this toy task.)
 
 ```cpp
-#include "HypercubeWTF.h"
+#include "WTF.h"
 #include <cstdio>
 #include <vector>
 
@@ -586,7 +604,6 @@ More context: [`examples/README.md`](../examples/README.md).
 
 | Doc | What it is |
 |-----|------------|
-| [project.md](project.md) | Charter — locked design and workplan |
 | [WhiteNoiseFilter.md](../examples/mnist/WhiteNoiseFilter.md) | White-noise field study (MNIST vehicle) |
 | [TrainingDataQualitySensitivity.md](../examples/mnist/TrainingDataQualitySensitivity.md) | Training-set quality study (MNIST vehicle) |
 | [examples/README.md](../examples/README.md) | Demo map and MNIST data notes |
@@ -598,7 +615,7 @@ More context: [`examples/README.md`](../examples/README.md).
 ## 13. Cheat sheet
 
 ```text
-#include "HypercubeWTF.h"
+#include "WTF.h"
 
 WTFConfig cfg;
 cfg.reservoir.dim = 7;                 // N = 128
