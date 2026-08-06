@@ -29,6 +29,8 @@ MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remain
 
 **White-noise pre-filter (for HypercubeCNN):** see [`mnist/WhiteNoiseFilter.md`](mnist/WhiteNoiseFilter.md) — same frozen-reservoir discipline as HypercubeESN, pre-filtering static cube fields for the HCNN head; at σ=0.5 reservoir ~0.93 vs bypass ~0.85; clean accuracy comparable.
 
+**Training-data quality sensitivity:** see [`mnist/TrainingDataQualitySensitivity.md`](mnist/TrainingDataQualitySensitivity.md) — under strong test AWGN, reservoir loses less than bypass when train is corrupted; on clean test both paths take a similar small hit.
+
 ## Binaries
 
 | Target | Folder | Data |
