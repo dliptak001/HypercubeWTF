@@ -104,8 +104,9 @@ Do **not** link ESN or HCNN as libraries.
 | HypercubeESN | **`feedback`** (**not** `main`) | `ae3fb6430e557066a25d7678fdbfedad81093697` |
 | HypercubeCNN | `main` | `20bbb23476342abfd957fdc0fabe88e4dad7ae00` |
 
-Record the same in `VENDORED.md` when the files are copied. Re-sync later only
-when useful — this is not “stay API-compatible with ESN forever.”
+Record HypercubeCNN pin details in `third_party/HypercubeCNN/VENDORED.md` when
+that tree is re-copied. Re-sync HCNN deliberately — not continuous tracking.
+Reservoir/Readout are WTF-owned; this is not “stay API-compatible with ESN forever.”
 
 **External feedback:** not used, **not ported**, no stubs that invite misuse.
 No feedback port.

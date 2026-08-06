@@ -1,4 +1,17 @@
-// Smoke: episode contract + synthetic 2-class train/predict.
+/// @file wtf_smoke.cpp
+/// @brief Fast CI gate: WTF episode contract + tiny 2-class train/predict.
+///
+/// No data files. Covers (in order):
+///   1) defaults (N, T, B, M, FeatureSize), non-mutation, determinism, isolation
+///   2) T > N orbit, B=2 pack vs SliceAt, invalid B, ic_seed ≠ weight seed
+///   3) Collect / Train / PredictClass
+///   4) CollectEpisodes parallel vs serial train parity
+///   5) train_input_noise_sigma collect-only (and that collect applies σ)
+///   6) bypass_reservoir field → features (+ B must be 1)
+///
+/// Fail = exit 1 + stderr; success = a few "ok ..." lines on stdout.
+/// Charter: docs/project.md (§4 episode). Sibling demos: wtf_synth, wtf_mnist.
+
 #include "WTF.h"
 
 #include <cmath>
@@ -10,6 +23,9 @@
 #include <vector>
 
 namespace {
+
+// MakeCfg uses reservoir.dim = 5 → N = 32.
+constexpr size_t kSmokeN = 32;
 
 WTFConfig MakeCfg()
 {
@@ -71,10 +87,10 @@ int main()
 {
     try
     {
-        // ----- Episode contract (charter §4) -----
+        // ----- Episode contract (docs/project.md §4) -----
         {
             WTF wtf(MakeCfg());
-            if (wtf.N() != 32 || wtf.T() != wtf.N() || wtf.B() != 1 || wtf.M() != 4
+            if (wtf.N() != kSmokeN || wtf.T() != wtf.N() || wtf.B() != 1 || wtf.M() != 4
                 || wtf.FeatureSize() != wtf.N())
             {
                 std::fprintf(stderr, "defaults: N=%zu T=%zu B=%zu M=%zu F=%zu\n",
@@ -149,7 +165,7 @@ int main()
             }
         }
 
-        // B = 2: feature pack is ages 0..1; readout dim auto = dim + 1.
+        // B = 2: pack ages 0..1; readout dim auto = dim + log2(B) = dim + 1.
         {
             auto cfg = MakeCfg();
             cfg.episode.readout_slices = 2;
@@ -179,7 +195,7 @@ int main()
             }
         }
 
-        // Invalid B / IC seed splits s0 from weight seed.
+        // Invalid B; IC seed splits s0 from weight seed.
         {
             auto bad_b = MakeCfg();
             bad_b.episode.readout_slices = 3; // not power of two
@@ -206,7 +222,7 @@ int main()
             }
         }
 
-        // ----- Phase 3 train / predict -----
+        // ----- Train / predict (collect → train → AccuracyOnCollected / PredictClass) -----
         {
             WTF wtf(MakeCfg());
             constexpr int kPerClass = 24;
@@ -261,7 +277,7 @@ int main()
                         acc, wtf.N(), wtf.T());
         }
 
-        // ----- Parallel CollectEpisodes: same frozen weights → same features -----
+        // ----- Parallel CollectEpisodes: same seeds → same train result -----
         {
             auto cfg = MakeCfg();
             cfg.readout.epochs = 60;
@@ -270,21 +286,18 @@ int main()
             constexpr int kPerClass = 12;
             std::vector<float> fields;
             std::vector<int> labels;
-            {
-                WTF sizing(cfg);
-                fields.reserve(static_cast<size_t>(2 * kPerClass) * sizing.N());
-            }
+            fields.reserve(static_cast<size_t>(2 * kPerClass) * kSmokeN);
             for (int rep = 0; rep < kPerClass; ++rep)
             {
-                auto x0 = MakeField(1u << 5, 0); // N=32 from MakeCfg dim=5
-                // Rebuild with live N after we know it — use fixed N=32.
-                x0 = MakeField(32, 0);
-                x0[static_cast<size_t>(rep) % 16] += 0.01f * static_cast<float>(rep);
+                auto x0 = MakeField(kSmokeN, 0);
+                x0[static_cast<size_t>(rep) % (kSmokeN / 2)] +=
+                    0.01f * static_cast<float>(rep);
                 fields.insert(fields.end(), x0.begin(), x0.end());
                 labels.push_back(0);
 
-                auto x1 = MakeField(32, 1);
-                x1[static_cast<size_t>(rep) % 16] -= 0.01f * static_cast<float>(rep);
+                auto x1 = MakeField(kSmokeN, 1);
+                x1[static_cast<size_t>(rep) % (kSmokeN / 2)] -=
+                    0.01f * static_cast<float>(rep);
                 fields.insert(fields.end(), x1.begin(), x1.end());
                 labels.push_back(1);
             }
@@ -308,8 +321,9 @@ int main()
                 return 1;
             }
 
-            // Feature parity: episode on primary must match bulk-worker episode
-            // for the same field (identical weight seed + s0).
+            // Primaries share weight seed + s0 → same RunEpisode for sample 0.
+            // Train-acc equality is a proxy that serial CollectEpisode and bulk
+            // CollectEpisodes produced matching feature rows (single-thread HCNN).
             {
                 const float* x = fields.data();
                 serial.RunEpisode(std::span<const float>(x, serial.N()));
@@ -326,7 +340,6 @@ int main()
             parallel.TrainOnCollected();
             const double acc_s = serial.AccuracyOnCollected();
             const double acc_p = parallel.AccuracyOnCollected();
-            // Identical features + deterministic single-thread HCNN → same acc.
             if (std::fabs(acc_s - acc_p) > 1e-12)
             {
                 std::fprintf(stderr,
@@ -344,7 +357,7 @@ int main()
             std::printf("wtf_smoke: ok parallel collect acc=%.3f\n", acc_p);
         }
 
-        // ----- Collect input noise: σ only on collect; RunEpisode stays clean -----
+        // ----- Collect input noise: σ on collect only; RunEpisode stays clean -----
         {
             auto cfg = MakeCfg();
             cfg.readout.epochs = 1;
@@ -352,15 +365,26 @@ int main()
             cfg.episode.collect_threads = 1;
             cfg.episode.train_input_noise_sigma = 0.05f;
 
-            auto x = MakeField(32, 0);
+            auto x = MakeField(kSmokeN, 0);
             WTF noisy(cfg);
             noisy.CollectEpisode(x, 0);
+            // LastFeatures after collect = orbit on noise-corrupted field.
+            const std::vector<float> feat_collect(noisy.LastFeatures().begin(),
+                                                  noisy.LastFeatures().end());
             noisy.RunEpisode(x);
+            const std::vector<float> feat_run(noisy.LastFeatures().begin(),
+                                              noisy.LastFeatures().end());
+            if (Near(feat_collect, feat_run))
+            {
+                std::fprintf(stderr,
+                             "train_input_noise: CollectEpisode must apply σ\n");
+                return 1;
+            }
 
             cfg.episode.train_input_noise_sigma = 0.0f;
             WTF clean(cfg);
             clean.RunEpisode(x);
-            if (!Near(noisy.LastFeatures(), clean.LastFeatures()))
+            if (!Near(feat_run, clean.LastFeatures()))
             {
                 std::fprintf(stderr, "train_input_noise: RunEpisode must ignore σ\n");
                 return 1;
@@ -375,6 +399,12 @@ int main()
 
         // ----- bypass_reservoir: field is features; collect+train still works -----
         {
+            auto bad_b = MakeCfg();
+            bad_b.episode.bypass_reservoir = true;
+            bad_b.episode.readout_slices = 2; // must be 1
+            if (!ExpectThrow("bypass requires B==1", [&] { WTF w(bad_b); }))
+                return 1;
+
             auto cfg = MakeCfg();
             cfg.episode.bypass_reservoir = true;
             cfg.episode.readout_slices = 1;

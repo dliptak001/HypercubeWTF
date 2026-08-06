@@ -14,7 +14,6 @@
 /// Sibling: examples/mnist/wtf_mnist.cpp (IDX data; study A/Bs).
 
 #include "WTF.h"
-#include "done_beep.h"
 #include "print_config.h"
 
 #include <chrono>
@@ -263,6 +262,5 @@ int main()
     {
         std::fprintf(stderr, "wtf_synth: %s\n", e.what());
     }
-    wtf_ex::DoneBeep();
     return exit_code;
 }

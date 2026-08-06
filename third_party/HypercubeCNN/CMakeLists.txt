@@ -1,4 +1,4 @@
-# Vendored HypercubeCNN — see ../VENDORED.md and this directory's VENDORED.md.
+# Vendored HypercubeCNN — see VENDORED.md in this directory.
 # Build glue for HypercubeWTF (not upstream). Core inherits parent flags.
 
 find_package(Threads REQUIRED)

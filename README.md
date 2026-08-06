@@ -8,7 +8,7 @@ Static length-N fields → driven hypercube reservoir orbit → HypercubeCNN rea
 (end-of-episode sample).
 
 Design charter: [`docs/project.md`](docs/project.md)  
-Vendored / forked sources: [`VENDORED.md`](VENDORED.md)
+Vendored HypercubeCNN: [`third_party/HypercubeCNN/VENDORED.md`](third_party/HypercubeCNN/VENDORED.md)
 
 **Status:** Phase 4 — demos (`wtf_synth`, `wtf_mnist`) + collect/train/predict core.
 

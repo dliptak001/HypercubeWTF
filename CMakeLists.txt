@@ -5,12 +5,28 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Single-config generators (Ninja/Make): empty CMAKE_BUILD_TYPE disables
+# $<CONFIG:…> flags below. Multi-config (VS, Xcode) leaves this alone.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# ——— HypercubeCNN (vendored) ———
+# ——— HypercubeCNN (vendored core; see third_party/HypercubeCNN/VENDORED.md) ———
 add_subdirectory(third_party/HypercubeCNN)
+
+# ——— Shared compile flags (core + demos) ———
+add_library(wtf_compile_flags INTERFACE)
+target_compile_options(wtf_compile_flags INTERFACE
+    $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
+    $<$<CONFIG:Debug>:-O0 -g>
+    -Wall -Wextra -Wno-unknown-pragmas
+)
+if(MINGW)
+    target_link_options(wtf_compile_flags INTERFACE
+        -static-libgcc
+        -static-libstdc++
+    )
+endif()
 
 # ——— Core library ———
 add_library(HypercubeWTFCore STATIC
@@ -24,42 +40,26 @@ target_include_directories(HypercubeWTFCore
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
 )
 
-target_link_libraries(HypercubeWTFCore PUBLIC HypercubeCNNCore)
-
-target_compile_options(HypercubeWTFCore PRIVATE
-    $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
-    $<$<CONFIG:Debug>:-O0 -g>
-    -Wall -Wextra -Wno-unknown-pragmas
+target_link_libraries(HypercubeWTFCore
+    PUBLIC  HypercubeCNNCore
+    PRIVATE wtf_compile_flags
 )
 
-if(MINGW)
-    target_link_options(HypercubeWTFCore PRIVATE -static-libgcc -static-libstdc++)
-endif()
-
-# ——— Smoke + Phase 4 demos (top-level project only) ———
+# ——— Smoke + demos (only when this repo is the top-level project) ———
 # Layout: examples/<demo>/…  shared headers: examples/common/
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     function(wtf_add_exe name)
         cmake_parse_arguments(WTF_EX "" "" "SOURCES;INCLUDES" ${ARGN})
         add_executable(${name} ${WTF_EX_SOURCES})
-        target_link_libraries(${name} PRIVATE HypercubeWTFCore)
+        target_link_libraries(${name} PRIVATE HypercubeWTFCore wtf_compile_flags)
         target_include_directories(${name} PRIVATE
             ${PROJECT_SOURCE_DIR}/examples/common
             ${WTF_EX_INCLUDES}
         )
-        target_compile_options(${name} PRIVATE
-            $<$<CONFIG:Release>:-O3 -march=x86-64-v2 -ffast-math>
-            $<$<CONFIG:Debug>:-O0 -g>
-            -Wall -Wextra -Wno-unknown-pragmas
-        )
         if(MINGW)
-            target_link_options(${name} PRIVATE -static-libgcc -static-libstdc++)
+            # Debug MinGW + static libs can hit duplicate symbols on some hosts.
             target_link_options(${name} PRIVATE
                 $<$<CONFIG:Debug>:-Wl,--allow-multiple-definition>)
-        endif()
-        if(WIN32)
-            # done_beep.h → PlaySound (system aliases); Beep() is unreliable.
-            target_link_libraries(${name} PRIVATE winmm)
         endif()
     endfunction()
 
@@ -68,14 +68,4 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     wtf_add_exe(wtf_mnist
         SOURCES examples/mnist/wtf_mnist.cpp
         INCLUDES ${PROJECT_SOURCE_DIR}/examples/mnist)
-
-    # Deploy binary for local tooling (e.g. C:\HypercubeWTF\wtf_mnist.exe).
-    # Runs after every successful wtf_mnist link (Release and Debug build dirs).
-#    add_custom_command(TARGET wtf_mnist POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E make_directory "C:/HypercubeWTF"
-#        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#                $<TARGET_FILE:wtf_mnist>
-#                "C:/HypercubeWTF/$<TARGET_FILE_NAME:wtf_mnist>"
-#        COMMENT "Copy wtf_mnist → C:/HypercubeWTF"
-#    )
 endif()

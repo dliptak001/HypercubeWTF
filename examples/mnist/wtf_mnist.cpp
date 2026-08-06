@@ -29,7 +29,6 @@
 /// Knobs: MakeWTFConfig() = product WTFConfig; demo constants below.
 
 #include "WTF.h"
-#include "done_beep.h"
 #include "find_data_dir.h"
 #include "mnist_idx.h"
 #include "pack_field.h"
@@ -403,6 +402,5 @@ int main(int argc, char** argv)
                      "  t10k-images-idx3-ubyte   t10k-labels-idx1-ubyte\n"
                      "See examples/README.md (Appendix: MNIST files)\n");
     }
-    wtf_ex::DoneBeep();
     return exit_code;
 }

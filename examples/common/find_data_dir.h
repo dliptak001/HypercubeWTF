@@ -2,7 +2,6 @@
 
 // MNIST data location for demos. Fixed local deploy root only:
 //   C:\HypercubeWTF\data
-// (same tree as the optional CMake POST_BUILD copy of wtf_mnist.exe).
 // Never walks the CLion / source-tree clone. Example-only helper.
 
 #include <filesystem>
