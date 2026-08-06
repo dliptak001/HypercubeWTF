@@ -251,6 +251,7 @@ Link **`HypercubeWTFCore`** (it pulls **`HypercubeCNNCore`** for you).
 These are product contracts, not implementation trivia.
 
 - **Every field is length N.** Wrong size throws.
+- **Values are usually kept in [-1, 1].** The library trusts the host; it does not clamp.
 - **You pack; WTF drives.** No built-in image layout.
 - **Reservoir and s0 freeze at construct.** Every episode reloads the same s0.
 - **Only the end state** goes to the readout (optional multi-age pack `B`).
@@ -259,7 +260,7 @@ These are product contracts, not implementation trivia.
 - **`AccuracyOnCollected` / `R2OnCollected` are training-set scores**, not held-out.
 - **One `WTF` per thread of control.** Bulk collect parallelizes *inside* one call;
   do not call public methods concurrently on the same object.
-- **`WTF` is not copyable.** Prefer exclusive ownership (move exists if you need it).
+- **`WTF` is not copyable.** Prefer exclusive ownership of one instance.
 
 ### The loop you will write
 
@@ -378,6 +379,9 @@ int main() {
 
 ## 7. The API you actually use
 
+Authoritative signatures and contracts live in **`WTF.h`** (and the headers it
+pulls). This section is the host-oriented map.
+
 ### Config at a glance
 
 Everything interesting is set **before** `WTF` is constructed.
@@ -447,7 +451,7 @@ wtf.readout_config();   // resolved config (dim filled in if auto)
 ```
 
 Construction checks the usual mistakes: bad T, B not a power of two, B > M,
-invalid noise σ, wrong readout dim, `num_outputs < 1`.
+bypass with B ≠ 1, invalid noise σ, wrong readout dim, `num_outputs < 1`.
 
 ### Run an episode (no training)
 
