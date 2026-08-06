@@ -5,15 +5,22 @@
 > co-development only.
 
 Static length-N fields → driven hypercube reservoir orbit → HypercubeCNN readout
-(end-of-episode sample).
+(end-of-episode sample). The product surface is **small and contract-driven**:
+hosts integrate **`WTF`** (see the C++ SDK).
 
-Design charter: [`docs/project.md`](docs/project.md)  
-Vendored HypercubeCNN: [`third_party/HypercubeCNN/VENDORED.md`](third_party/HypercubeCNN/VENDORED.md)
+| Doc | Role |
+|-----|------|
+| [**docs/CPP_SDK.md**](docs/CPP_SDK.md) | **Product API** — contracts, `WTF` surface, recipes |
+| [docs/project.md](docs/project.md) | Design charter (goals, locked decisions, workplan) |
+| [third_party/HypercubeCNN/VENDORED.md](third_party/HypercubeCNN/VENDORED.md) | Vendored HCNN pin |
+| [examples/README.md](examples/README.md) | Demos only (not the SDK definition) |
 
 **Status:** Phase 4 — demos (`wtf_synth`, `wtf_mnist`) + collect/train/predict core.
 
+**Front door:** `#include "HypercubeWTF.h"` (or `WTF.h`) · link **`HypercubeWTFCore`**.
 
-TODO:  Acknowledge that a more rigorous study needs to be performed to firmly establish the claims made.
+TODO: Acknowledge that a more rigorous study needs to be performed to firmly
+establish the claims made.
 
 ## Build (CLion)
 

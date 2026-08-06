@@ -4,6 +4,8 @@
 > Update when decisions land; do not leave resolved debates only in chat.
 >
 > **Status:** Phase 4 demos in tree (`wtf_synth`, `wtf_mnist`); polish / richer packs next.
+>
+> **Product API (hosts):** [`CPP_SDK.md`](CPP_SDK.md) — not this charter.
 
 ---
 
