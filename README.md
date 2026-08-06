@@ -10,7 +10,7 @@ hosts integrate **`WTF`** (see the C++ SDK).
 
 | Doc | Role |
 |-----|------|
-| [**docs/CPP_SDK.md**](docs/CPP_SDK.md) | **Product API** — contracts, `WTF` surface, recipes |
+| [**docs/CPP_SDK.md**](docs/CPP_SDK.md) | **Product API** — why explore, contracts, `WTF` surface, recipes |
 | [docs/project.md](docs/project.md) | Design charter (goals, locked decisions, workplan) |
 | [third_party/HypercubeCNN/VENDORED.md](third_party/HypercubeCNN/VENDORED.md) | Vendored HCNN pin |
 | [examples/README.md](examples/README.md) | Demos only (not the SDK definition) |
