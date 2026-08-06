@@ -79,17 +79,33 @@ static const char* PackModeName(PackMode pack)
 // Same knobs PadLow control: test_acc=0.966 (9659/10000) acc_on_collected=0.982
 // =============================================================================
 
+// =============================================================================
+//
+// BEST RUN SO FAR FOR HIGH NOISE RESISTANCE:
+// wtf_mnist: N=1024 T=20 B=1 M=4 ic_seed=12 collect_threads=0 (auto: leave 1-2 cores free) input_noise_sigma=0 bypass_reservoir=false
+// reservoir: dim=10 N=1024 M=4 seed=13871537636959942979 SR_target=0.4 leak=1 in_scale=0.005 bias_scale=0 SR_realized=0.398801
+// readout: layers=1 weights=82122 pooling=max activation=leaky_relu lr_max=0.0015
+// wtf_mnist: pack=PadLowCenter train=60000 test=10000 epochs=40
+// wtf_mnist: PadLowCenter full=28x28@ [0,784) center=15x16@(6,6) pattern=1024 N=1024
+// wtf_mnist: aug=off
+// wtf_mnist: test_noise=off
+// Collecting 60000 episodes (parallel)...
+// Training readout on 60000 episodes...
+// wtf_mnist: acc_on_collected=0.978 test_acc=0.970 (9701/10000)
+// wtf_mnist: time 112.6+8.4=120.9s (collect+train|test|total)
+// =============================================================================
+
 static WTFConfig MakeWTFConfig()
 {
     WTFConfig cfg;
 
     // Reservoir (fixed dynamics)
     cfg.reservoir.dim           = 10; // N = 1024; PadLow/PadLowCenter need dim >= 10
-    cfg.reservoir.history_depth = 2;
+    cfg.reservoir.history_depth = 4;
     cfg.reservoir.seed          = 13871537636959942979ull;
-    cfg.reservoir.spectral_radius = 0.95;
-    cfg.reservoir.input_scaling = 0.01;//0.015;
-    cfg.reservoir.bias_scaling  = 0.003;
+    cfg.reservoir.spectral_radius = 0.4; //0.4-acc_on_collected=0.978 test_acc=0.929; 0.6-acc_on_collected=0.986 test_acc=0.922; 0.7-acc_on_collected=0.986 test_acc=0.921; 0.95-acc_on_collected=0.978 test_acc=0.912
+    cfg.reservoir.input_scaling = 0.005;
+    cfg.reservoir.bias_scaling  = 0.0; //0.003;
     cfg.reservoir.verbose       = false;
 
     // Episode IC (separate from weight seed)
@@ -111,9 +127,9 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.channel_growth          = 1;
     cfg.readout.use_pooling             = true;
     cfg.readout.conv_channels           = 16;
-    cfg.readout.activation              = ReadoutActivation::LEAKY_RELU;
+    cfg.readout.activation              = ReadoutActivation::NONE;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.epochs                  = 40;
+    cfg.readout.epochs                  = 85;
     cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;
@@ -159,8 +175,8 @@ static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
 // before PredictClass. 0 = off (default). Independent of train aug and of
 // episode.input_noise_sigma. Deterministic per sample from kTestNoiseSeedBase.
 // High-noise bypass A/B: try σ in ~0.3–0.5 on [-1,1]-ish packed fields.
-static constexpr float    kTestNoiseSigma    = 0.5f;
-static constexpr unsigned kTestNoiseSeedBase = 0x7E57u;
+static constexpr float    kTestNoiseSigma    = 0.0f;
+static constexpr unsigned kTestNoiseSeedBase = 0x1E57u; //0x7E57u;
 
 // =============================================================================
 // Helpers

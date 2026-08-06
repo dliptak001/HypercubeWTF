@@ -123,7 +123,7 @@ inline void DoneBeep()
             ::Sleep(300);
         }
     }
-    ::Sleep(150);
+    ::Sleep(1500);
 #else
     for (int i = 0; i < 3; ++i)
     {

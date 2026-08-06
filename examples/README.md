@@ -27,7 +27,7 @@ MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remain
 
 **Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.input_noise_sigma` (collect-only).
 
-**High-noise bypass A/B** (σ=0.5, train clean): see [`mnist/RESULTS_test_noise_bypass.md`](mnist/RESULTS_test_noise_bypass.md) — orbit test_acc 0.911 vs bypass 0.847.
+**Test noise × bypass vs orbit:** see [`mnist/RESULTS_test_noise_bypass.md`](mnist/RESULTS_test_noise_bypass.md) — at σ=0.5 orbit ~0.93 vs bypass ~0.85 (3 seeds); at σ=0.1 / clean, bypass slightly better.
 
 ## Binaries
 
