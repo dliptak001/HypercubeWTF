@@ -80,7 +80,7 @@ static const char* PackModeName(PackMode pack)
 // Demo pack / noise (outside WTFConfig; see k* below): pack=PadLowCenter,
 //   train=60000 test=10000, aug=off, kTestNoiseSigma / kTestNoiseSeedBase.
 //
-// Measured bypass vs reservoir (see examples/mnist/Evaluation.md):
+// Measured bypass vs reservoir (see examples/mnist/WhiteNoiseFilter.md):
 //   clean: reservoir ≈ bypass (test_acc≈0.979)
 //   AWGN σ=0.5 on packed field (multi-seed): reservoir≈0.93 vs bypass≈0.85
 // =============================================================================

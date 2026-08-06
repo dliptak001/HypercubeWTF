@@ -27,7 +27,7 @@ MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remain
 
 **Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.train_input_noise_sigma` (train/collect-only).
 
-**Evaluation (hypercube reservoir as white-noise filter):** see [`mnist/Evaluation.md`](mnist/Evaluation.md) — same frozen-reservoir discipline as HypercubeESN, used as a static-field preprocessor; at σ=0.5 reservoir ~0.93 vs bypass ~0.85; clean accuracy comparable.
+**White-noise pre-filter (for HypercubeCNN):** see [`mnist/WhiteNoiseFilter.md`](mnist/WhiteNoiseFilter.md) — same frozen-reservoir discipline as HypercubeESN, pre-filtering static cube fields for the HCNN head; at σ=0.5 reservoir ~0.93 vs bypass ~0.85; clean accuracy comparable.
 
 ## Binaries
 
