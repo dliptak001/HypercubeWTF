@@ -20,6 +20,26 @@ or any length-N floats you build yourself.
 
 Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 
+### What does WTF stand for?
+
+Not a solemn three-word paper title — though that route was tried.
+
+The brief was simple: take the HypercubeESN idea — frozen reservoir, trained
+head — and aim it at **data that has no time**. Spectra. Frames. Fingerprints.
+Stills. There was no lineage to steal a name from, so the usual naming exercise
+followed. Nothing stuck. There was even a brief attempt at a “real”
+acronym built from a mouthful like *temporal-translation Gaussian additive-white-
+noise CNN pre-filter on a hypercube substrate* — the kind of expansion that
+looks at home in a methods section and dies the moment you have to say it out
+loud. Weeks of “maybe this?” and “nah.” At some point the working monologue was
+just **what the f\*\*\* do we call this new toy?**
+
+So we called it that.
+
+**HypercubeWTF**
+
+The monologue won — and the brand gained a little personality :-)
+
 ---
 
 <p align="center">
