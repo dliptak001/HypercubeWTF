@@ -1,223 +1,265 @@
 # HypercubeWTF C++ SDK
 
-HypercubeWTF is a **C++23 episode product**: a static length-N field drives a
-**frozen hypercube reservoir** for T passes, then a **HypercubeCNN readout**
-learns from the **end-of-episode** feature pack. The public surface is **small
-and contract-driven** so hosts can integrate one type (`WTF`) without learning
-the full ESN or HCNN stacks.
+You choose a cube dimension **dim** (an integer from 5 to 16). That fixes the
+field length **N = 2<sup>dim</sup>** — for example dim 7 → N = 128, dim 10 →
+N = 1024. You place a fixed pattern on those vertices (an image pack, a
+spectrum, or any length-N floats you built yourself). HypercubeWTF **drives
+that field through a frozen reservoir** for a short synthetic orbit, then
+**trains a small CNN only on the state at the end**. One class does the whole
+loop: collect episodes, train the head, predict.
 
-**Examples stay examples. Helpers stay optional. Neither is the product’s reason
-for existing** — the core (`WTF`) is.
+You do not need to learn HypercubeESN or HypercubeCNN first. Link
+**`HypercubeWTFCore`**, include **`WTF.h`** (or **`HypercubeWTF.h`**), and work
+with **`WTF`**. Demos and packing helpers are optional recipes; they are not the
+product.
 
-Canonical API guide for **`HypercubeWTFCore` 0.1.x** (early development; APIs
-may still move). Aligned with the public headers and in-tree demos. Design
-charter (goals, locked decisions, workplan): **[project.md](project.md)**.
+This guide matches the public headers for **0.1.x** (early development — expect
+change). For goals and locked design choices, see **[project.md](project.md)**.
 
-**Primary audience:** engineers embedding WTF in a host binary (offline collect →
-train → predict).  
-**Secondary:** engineers learning the HypercubeAI family — same API, progressive
-disclosure, worked demos.
+**Who it is for:** anyone embedding WTF in a host (collect → train → predict),
+and anyone learning the stack with the same API the demos use.
 
-**Package:** C++23 static library **`HypercubeWTFCore`**. Headers live at the
-repo root. Depends on vendored **`HypercubeCNNCore`** (used inside the readout;
-hosts normally do not call HCNN directly).
-
----
-
-## 1. What you are building
-
-HypercubeWTF turns a **static** high-dimensional field into a **synthetic orbit**
-on the Boolean hypercube, then samples **once at the end**.
-
-| Product | Natural data | Pipeline |
-|---------|--------------|----------|
-| HypercubeESN | Low-dim **streams** | `u_t` → step → multi-slice → HCNN |
-| HypercubeCNN | Static patterns on the cube | embed → conv+pool → labels |
-| **HypercubeWTF** | Static high-dim, **no** intrinsic time | length-N `x` → drive orbit → **end state** → HCNN |
-
-| Idea | Meaning in code |
-|------|-----------------|
-| Cube dimension `dim` | Integer in **[5, 16]**; `N = 2^dim` vertices |
-| Field `x` | Caller-owned length-N floats (often in `[-1, 1]`); fixed for one episode |
-| Episode | Load frozen IC `s0` → `T` drive passes → pack `B` end delay-line ages |
-| Reservoir | **Frozen** recurrent dynamics (weights drawn once) |
-| Readout | **Trained** HypercubeCNN head on end features (`FeatureSize() = B * N`) |
-
-### Capacity is topological (power of two)
-
-Per episode the field is **always** length `N = 2^dim`. That is the size of the
-Boolean hypercube — not a free “input_size = 784” the library can relax.
-
-| What the core does | What it does **not** do |
-|--------------------|-------------------------|
-| Own length-N episodes and end feature packs | Accept free-length raw vectors as the field |
-| Affine re-address of fixed `x` each pass (`v XOR c`) | Learn packing of images/spectra into the cube |
-| Train only the HCNN readout | Train reservoir weights or IC |
-| Optional multi-age pack `B` at the **end** only | Stream intermediate passes into the readout |
-
-**Non–power-of-two data is normal.** Pack outside WTF (pad, spatial embed,
-custom maps). Optional demo helpers under `examples/common/` are one MNIST-oriented
-recipe — not part of the product core.
-
-**Pipeline:**
-
-```text
-x ∈ R^N   (caller-packed; fixed for the episode)
-  → LoadIC(s0)
-  → for pass = 0 .. T-1:
-        drive[v] = x[(v XOR c) & (N-1)]
-        InjectInputField + Step
-        c += 1
-  → pack B end delay-line ages  →  features[B*N]
-  → HCNN readout  →  num_outputs
-```
-
-When `bypass_reservoir` is true, the orbit is skipped and features are the
-length-N field itself (`B` must be 1). Same collect / train / predict surface.
+**What you get:** a C++23 static library. Headers sit at the repo root. A
+vendored HypercubeCNN builds the trainable readout; hosts usually never call
+HCNN themselves.
 
 ---
 
-## 2. Mental model of one episode
+## 1. The big picture
 
-Each **pass** re-registers the **same** field under a new address offset `c`
-(starts at 0 every episode). Geometry and frozen weights never move with `c`;
-only the field→vertex map does. Default `T = N` is one full tour of offsets;
-`T > N` is allowed (address wraps).
+Most learning systems either see a **stream** (one small input every step) or a
+**static pattern** (classify an image once). WTF sits in between:
 
-```text
-LoadInitialCondition(s0)          // frozen; reloaded every episode
-c = 0
-for pass in 0 .. T-1:
-    drive[v] = x[(v XOR c) & (N - 1)]   // length-N stage
-    Step()                              // W_in gather + recurrent + delay line
-    c += 1
-features = concat( SliceAt(0), …, SliceAt(B-1) )   // end of delay line only
-```
+1. You give it one full-length field (which may be an image) on the cube.
+2. It **re-addresses that same field** for `T` passes (a synthetic orbit).
+3. It takes a **single snapshot at the end** and trains a CNN on those features.
 
-| Piece | Train? |
-|-------|--------|
-| Recurrent weights, `W_in`, bias | Frozen |
-| Episode IC **s0** (`N × M`) | Frozen (drawn once from `ic_seed`) |
-| Field packing | Caller-owned |
-| HCNN readout | **Trained** |
+The reservoir weights never train. Only the readout does. That is the whole
+product idea.
 
-**Vocabulary**
+| Library | You typically feed it… | What runs |
+|---------|------------------------|-----------|
+| HypercubeESN | a **stream** of small inputs over real time | step → state → HCNN |
+| HypercubeCNN | a **static** pattern already on the cube | conv stack → labels |
+| **HypercubeWTF** | a **static** length-N field with no real time | orbit → **end state** → HCNN |
 
-| Term | Meaning |
-|------|---------|
-| **N** | `2^dim`; field length and one state slice |
-| **T** | Drive-pass count (config `0` → use N) |
-| **B** | End ages packed into features (`readout_slices`; power of two, `1 ≤ B ≤ M`) |
-| **M** | `history_depth` — delay-line depth |
-| **s0** | Frozen IC, length `N × M`; separate from weight seed |
-| **FeatureSize** | `B * N` floats into the readout |
+### Your data does not have to be a power of two
+
+**dim** is the only size knob for the cube: it is set on
+`ReservoirConfig::dim` and yields **N = 2<sup>dim</sup>** vertices. The field
+WTF accepts is always that length — geometry, not a style preference.
+
+If your raw data is 784 pixels or 300 bins, **you** map it onto N floats first
+(pad, resize, spatial embed, custom layout — your choice). WTF does not invent
+that map. Demo helpers under `examples/common/` are one MNIST-oriented recipe;
+skip them when you pack your own way.
+
+### What freezes vs what learns
+
+| Piece | Trains? |
+|-------|---------|
+| Reservoir weights and bias | No — drawn once at construct |
+| Starting state **s0** (full delay line) | No — drawn once from `ic_seed`, reloaded every episode |
+| How you pack domain data into the field | Your problem (outside WTF) |
+| HCNN readout | **Yes** |
+
+### Optional shortcut: skip the orbit
+
+Set `bypass_reservoir` and the features are simply the field itself (requires
+`B == 1`). Same collect / train / predict API — useful for A/B against “just
+the pack.”
 
 ---
 
-## 3. SDK layers and source tree
+## 2. One episode, step by step
 
-| Layer | Role |
-|-------|------|
-| **Core (`WTF`)** | The product. Integration surface — document like a library another binary links. |
-| **Config types** | `WTFConfig`, `EpisodeConfig`, `ReservoirConfig`, `ReadoutConfig` (+ readout enums). Set once at construct. |
-| **Inspection** | `wtf.reservoir()` / `wtf.readout()` for live SR, weights, advanced readout I/O. |
-| **Examples** | Proof of contracts + recipes (`wtf_smoke`, `wtf_synth`, `wtf_mnist`). Not the definition of the SDK. |
-| **Vendored HCNN** | `third_party/HypercubeCNN` — linked by the readout; **not** the host integration surface for WTF apps. |
+Think of an **episode** as: reset to a known start, drive for a while, read once.
 
-### Source tree (public headers)
+That sentence is the same rhythm as classical reservoir computing (echo-state /
+ESN style), just aimed at a **static** field instead of a live stream.
+
+### Where the dynamical magic comes from
+
+A reservoir is a **fixed nonlinear dynamical system**. Weights are drawn once
+(here: recurrent cube edges, input gather `W_in`, optional bias), scaled so the
+recurrent part sits near a chosen **spectral radius**, and then left alone.
+You never backprop through that core. Training only fits a thin head on top of
+the state — in WTF, a HypercubeCNN readout.
+
+Each **step** does two things that matter:
+
+1. **Drive** — the current field pattern is injected through `W_in` so every
+   vertex feels a local mix of the input (strength set by `input_scaling`).
+2. **Recur** — each vertex updates from itself and its cube neighbors (bit-flip
+   edges), usually through a nonlinearity (tanh-family), with optional **leak**
+   so the state blends old and new rather than replacing fully.
+
+Do that many times and the high-dimensional state becomes a **nonlinear
+trajectory** shaped by both the input history and the fixed graph. The “echo”
+idea is that recent drive still rings in the state while older influence fades —
+if the spectral radius and leak are in a sensible regime, trajectories from
+different starts stay distinguishable without exploding. WTF reloads the **same
+frozen s0** every episode so two runs of the same field match bit-for-bit
+(modulo your packing).
+
+### Making time when you only have a still picture
+
+A classical ESN expects a **movie**: at time 0 a small input `u_0`, at time 1
+`u_1`, and so on. Each tick, fresh information arrives from the outside world.
+The reservoir’s job is to remember and mix that stream.
+
+WTF usually has the opposite problem: one **still** — a full length-N field
+(image pack, spectrum, whatever) with no natural “next frame.” If you only
+shoved that field in once and stepped forever, most of the pattern would be a
+one-shot kick; the dynamics would not systematically walk the spatial structure.
+
+So WTF invents a clock from space. Call the pass counter `c` (starts at 0 each
+episode). On pass `c`, every vertex `v` is driven by field sample
 
 ```text
-HypercubeWTF/
-  HypercubeWTF.h       # umbrella — includes WTF.h
-  WTF.h                # front door: WTF, WTFConfig, EpisodeConfig
-  Reservoir.h          # ReservoirConfig (+ Reservoir type for inspection)
-  Readout.h            # ReadoutConfig, enums, Readout type
-  Reservoir.cpp / Readout.cpp / WTF.cpp
-  third_party/HypercubeCNN/   # vendored; see VENDORED.md
-  examples/                   # demos + examples/common helpers
-  tests/wtf_smoke.cpp
-  docs/CPP_SDK.md             # this file
-  docs/project.md             # charter
+x[(v XOR c) & (N − 1)]
 ```
 
-| Product layer | Include | Required? |
-|---------------|---------|-----------|
-| Full product surface | `HypercubeWTF.h` or `WTF.h` | Yes (minimal integration) |
-| Config field types only | pulled via `WTF.h` | Yes |
-| MNIST pack helpers | `examples/common/*.h` | Demo-only |
-| Raw HCNN API | `third_party/...` | No — prefer `WTF` / `readout()` |
+Read that as: **the numbers in `x` never change**; you only change **which
+number sits on which vertex**. XOR with `c` is a fixed, invertible shuffle of
+addresses on the cube. Increment `c`, shuffle again. Geometry (who is neighbor
+to whom) and all frozen weights stay put — they do not slide with `c`. What
+moves is the **registration** of the field onto the graph.
 
-Link target: **`HypercubeWTFCore`** (pulls **`HypercubeCNNCore`**).
+Do that for `T` passes and the reservoir experiences a **synthetic time
+series**: not new pixels from a camera, but the same global pattern seen under
+`T` successive addressings. That orbit is what the echo digests.
 
-### Host contracts (integrators)
+You still follow RC discipline at the end: you do **not** train on every
+intermediate state. After the last pass you read **once** — the delay line’s
+newest ages (`B` of them, often just `B = 1`). That end pack is the feature
+row: a nonlinear, dynamical summary of “this whole field, driven through this
+orbit, starting from this s0.” Different fields (or different packs of the same
+domain data) leave different end signatures; the CNN only has to separate those.
 
-These rules are intentional product contracts, not implementation accidents.
+So the product hinge in one line: **spatial pattern in → fake time by
+re-addressing → real reservoir dynamics → one end snapshot → trained reader.**
+The magic is not a learned recurrent net. It is **rich fixed dynamics + a
+trained head**. Bypass mode (`bypass_reservoir`) skips the orbit and feeds the
+field straight to the CNN — the control question “did the reservoir actually
+help?”
 
-| Contract | Rule |
-|----------|------|
-| **Field length** | Every episode field is length **N**. Over/under size throws on `RunEpisode` / collect |
-| **Packing** | Host maps domain data → `R^N`. Core never invents image/sequence layout |
-| **Frozen dynamics** | Reservoir weights and `s0` fixed at construct; every episode reloads `s0` |
-| **End sample only** | Readout sees the **end** feature pack (optional multi-age `B`), not intermediate passes |
-| **Train noise** | `train_input_noise_sigma` applies on **collect** only — not `RunEpisode` / `Predict` / `PredictClass` |
-| **Bypass** | `bypass_reservoir` requires `B == 1`; features = field (noise still applies on collect) |
-| **Task / loss** | Classification → CE path; Regression → MSE path (fixed by `ReadoutTask`) |
-| **Outputs** | `Predict` returns raw logits / preds — **never** softmax |
-| **Collected metrics** | `AccuracyOnCollected` / `R2OnCollected` score the **training** set, not held-out data |
-| **Concurrency** | One `WTF` instance is exclusive-use (no concurrent public calls). Bulk collect parallelizes **internally** |
-| **Ownership** | `WTF` is non-copyable (move is available; prefer exclusive ownership) |
+### Mechanics in order
 
-**Canonical train/infer surface for new hosts** (do not grow beyond this without
-design review):
+1. Reload the frozen initial condition **s0** into the delay line.
+2. For pass `c = 0, 1, …, T−1`:
+   - Place the field on the cube with address offset `c`.
+   - One reservoir step (field inject + `W_in` gather + recurrent update).
+3. Build features from the **end** of the delay line only: ages `0 … B−1`
+   concatenated → length `B × N`.
+4. Hand those features to the readout (collect, train, or predict).
 
 ```text
-fill WTFConfig → WTF wtf(cfg)
-CollectEpisode / CollectEpisodes   (+ optional train_input_noise_sigma)
+x  (length N, fixed for this episode)
+    │
+    ▼
+ Load s0 → drive T times → pack B end ages → features (B×N)
+    │
+    ▼
+ HCNN readout → class logits or regression values
+```
+
+### Words you will see in the API
+
+| Word | Plain meaning |
+|------|----------------|
+| **dim** | Cube dimension you choose (5…16); set as `reservoir.dim` |
+| **N** | Field length = 2<sup>dim</sup> (also one reservoir state slice) |
+| **T** | How many drive passes (`episode.T = 0` means “use N”) |
+| **B** | How many end delay-line ages go into the feature vector (`readout_slices`) |
+| **M** | Delay-line depth (`history_depth`) |
+| **s0** | Frozen start state, length `N × M`, from `ic_seed` (not the weight seed) |
+| **FeatureSize** | `B * N` — what the readout eats |
+
+`B` must be a power of two and no larger than `M`. Default is `B = 1` (newest
+slice only).
+
+---
+
+## 3. What is the product (and what is not)
+
+Keep this map in mind when you open the tree:
+
+| You care about… | Use… |
+|-----------------|------|
+| Integrating the library | **`WTF`** + **`WTFConfig`** |
+| Logging realized spectral radius, saving readout weights | `wtf.reservoir()` / `wtf.readout()` |
+| Learning by example | `wtf_smoke`, `wtf_synth`, `wtf_mnist` |
+| MNIST paths / packing demos | `examples/common/` (optional) |
+| Raw HypercubeCNN | Almost never — that lives under the readout |
+
+```text
+HypercubeWTF.h     umbrella → WTF.h
+WTF.h              front door (WTF, WTFConfig, EpisodeConfig)
+Reservoir.h        ReservoirConfig (+ Reservoir for inspection)
+Readout.h          ReadoutConfig, enums, Readout
+… .cpp files …
+third_party/HypercubeCNN/    vendored; see VENDORED.md
+examples/                    demos, not the SDK definition
+docs/CPP_SDK.md              this guide
+docs/project.md              charter
+```
+
+Link **`HypercubeWTFCore`** (it pulls **`HypercubeCNNCore`** for you).
+
+### Rules that matter
+
+These are product contracts, not “implementation details.”
+
+- **Every field is length N.** Wrong size throws.
+- **You pack; WTF drives.** No built-in image layout.
+- **Reservoir and s0 freeze at construct.** Every episode reloads the same s0.
+- **Only the end state** goes to the readout (optional multi-age pack `B`).
+- **Train noise is collect-only.** `Predict` / `RunEpisode` stay clean.
+- **`Predict` returns raw logits** (or regression values) — no softmax.
+- **`AccuracyOnCollected` / `R2OnCollected` are training-set scores**, not held-out.
+- **One `WTF` per thread of control.** Bulk collect parallelizes *inside* one call;
+  do not call public methods concurrently on the same object.
+- **`WTF` is not copyable.** Prefer exclusive ownership (move exists if you need it).
+
+### The loop you will write
+
+```text
+fill WTFConfig
+construct WTF once
+collect many episodes   (optional train-input noise)
 TrainOnCollected
-Predict / PredictClass             (fresh clean episode each call)
-optional: RunEpisode + LastFeatures, AccuracyOnCollected / R2OnCollected
-optional: ClearCollected, bypass_reservoir A/B, collect_threads
+Predict / PredictClass  (always a fresh clean episode)
 ```
 
-Prefer **config structs** over long constructor argument lists. Prefer bulk
-`CollectEpisodes` for large datasets.
-
-### Integration contracts (quick table)
-
-| Contract | Rule |
-|----------|------|
-| **Capacity** | Field = N; features = B×N |
-| **T default** | `episode.T == 0` → T = N |
-| **B** | Power of two, `1 ≤ B ≤ M` |
-| **readout.dim** | `0` = auto `dim + log2(B)`; else must match |
-| **Train noise** | Collect only; deterministic from `ic_seed` + sample index |
-| **Predict** | Clean episode; no collect noise |
-| **Threading** | Exclusive `WTF`; pin `readout.num_threads = 1` if host multiplies nets |
-| **Ownership** | Non-copyable |
+Optional extras: `RunEpisode` + `LastFeatures`, train-set metrics, `ClearCollected`,
+bypass A/B, `collect_threads` for faster bulk collect.
 
 ---
 
 ## 4. Build and consume
 
-**Needs:** C++23, CMake ≥ 3.21. Prefer **Release** (Debug float paths differ under
-`-ffast-math` recipes).
+You need **C++23** and **CMake ≥ 3.21**. Prefer **Release** when you care about
+study numbers (Debug and Release float behavior can differ with the project’s
+fast-math flags).
 
-Open in CLion and reload CMake, or:
+In CLion: open the project, reload CMake, build. From a shell with the toolchain
+available:
 
 ```bash
 cmake --build cmake-build-release
 ```
 
-| Binary (top-level only) | Role |
-|-------------------------|------|
-| `wtf_smoke` | Episode contract + small train/predict |
-| `wtf_synth` | Synthetic multi-class (no data files) |
-| `wtf_mnist` | MNIST recipe (IDX under `C:\HypercubeWTF\data`) |
+When this repo is the top-level project you also get:
 
-When HypercubeWTF is **not** the top-level project, demos/smoke are skipped;
-consumers still get **`HypercubeWTFCore`**.
+| Binary | Role |
+|--------|------|
+| `wtf_smoke` | Fast contract + train smoke |
+| `wtf_synth` | Multi-class synthetic fields (no data files) |
+| `wtf_mnist` | MNIST recipe (IDX files under `C:\HypercubeWTF\data`) |
 
-### As a subdirectory
+If you pull HypercubeWTF in as a **subdirectory**, demos are skipped; you still
+get the library.
 
 ```cmake
 add_subdirectory(path/to/HypercubeWTF)
@@ -232,7 +274,9 @@ target_include_directories(my_app PRIVATE path/to/HypercubeWTF)
 
 ---
 
-## 5. First program (collect → train → predict)
+## 5. First program
+
+A tiny two-class example — collect, train, predict:
 
 ```cpp
 #include "HypercubeWTF.h"
@@ -245,7 +289,7 @@ int main() {
     cfg.reservoir.history_depth = 4;
     cfg.reservoir.seed = 1;
     cfg.ic_seed = 2;
-    cfg.episode.T = 0;                  // → N
+    cfg.episode.T = 0;                  // → T = N
     cfg.episode.readout_slices = 1;     // B = 1
     cfg.readout.dim = 0;                // auto
     cfg.readout.num_outputs = 2;
@@ -278,264 +322,243 @@ int main() {
 }
 ```
 
-**Integration habits:**
+**Habits that save pain later**
 
-1. Fill **`WTFConfig`**, construct **`WTF` once** (weights + `s0` freeze here).
-2. **Collect** many episodes, then **`TrainOnCollected`** once (or retrain without
-   clearing if you want another pass on the same features).
-3. **`Predict` / `PredictClass`** always run a **fresh clean** episode (no train noise).
-4. Packing is yours — demos show patterns; the core only accepts length-N fields.
+1. Build the config, construct **one** `WTF` (weights and s0 freeze here).
+2. Collect a dataset, then train. You can call `TrainOnCollected` again without
+   clearing if you want another pass on the same features.
+3. Treat `Predict` / `PredictClass` as clean inference — they never apply collect
+   noise.
+4. Keep packing in your code (or a demo helper). The core only accepts length-N
+   fields.
 
 ---
 
-## 6. Core API (`WTF`)
+## 6. The API you actually use
 
-### Config structs
+### Config at a glance
+
+Everything interesting is set **before** `WTF` is constructed.
 
 ```cpp
 struct EpisodeConfig {
-    size_t T = 0;                      // 0 → T = N after construct
-    size_t readout_slices = 1;         // B; power of two, ≤ M
-    size_t collect_threads = 0;        // 0 = auto (leave 1–2 cores free)
-    float  train_input_noise_sigma = 0.f;  // collect-only AWGN
-    bool   bypass_reservoir = false;   // field → features; requires B == 1
+    size_t T = 0;                         // 0 → use N
+    size_t readout_slices = 1;            // B
+    size_t collect_threads = 0;           // 0 = auto (leave OS/UI some cores)
+    float  train_input_noise_sigma = 0.f; // collect only
+    bool   bypass_reservoir = false;      // needs B == 1
 };
 
 struct WTFConfig {
     ReservoirConfig reservoir{};
     ReadoutConfig   readout{};
     EpisodeConfig   episode{};
-    uint64_t        ic_seed = 1;       // s0 only — not weight seed
+    uint64_t        ic_seed = 1;          // s0 only
 };
 ```
 
-#### ReservoirConfig (frozen dynamics)
+**Reservoir** (frozen dynamics) — common knobs:
 
-| Field | Role | Typical |
-|-------|------|---------|
-| `dim` | Cube dim; N = 2^dim; **[5, 16]** | 7–10 in demos |
-| `seed` | Weight / bias draws | fixed for reproducibility |
-| `spectral_radius` | Target SR for recurrent block | ~0.999 |
-| `leak_rate` | Leaky mix; (0, 1] | 1 |
-| `input_scaling` | Drive strength | 0.02–0.03 |
-| `history_depth` | M; **[1, 64]** | 4–16 |
-| `bias_scaling` | Bias amplitude; 0 = off | ~0.003 |
-| `verbose` | Construction banner | false |
+| Field | Meaning | Typical demos |
+|-------|---------|---------------|
+| `dim` | Cube dimension; N = 2<sup>dim</sup> (5…16) | 7–10 |
+| `seed` | Weight draws | fixed |
+| `spectral_radius` | Target for recurrent rescale | ~0.999 |
+| `leak_rate` | Mix each step; in (0, 1] | 1 |
+| `input_scaling` | How hard the field drives | ~0.02–0.03 |
+| `history_depth` | M (1…64) | 4–16 |
+| `bias_scaling` | Bias strength; 0 = off | ~0.003 |
+| `verbose` | Construction printout | false |
 
-#### ReadoutConfig (trainable head) — knobs hosts set most often
+**Readout** (trainable head) — knobs most hosts touch:
 
-| Field | Role |
-|-------|------|
-| `dim` | Feature dim; **0 = auto** `reservoir.dim + log2(B)` |
-| `num_outputs` | Classes or regression width |
-| `task` | `ReadoutTask::Classification` or `Regression` |
-| `epochs`, `batch_size` | Batch train loop |
-| `lr_max`, `lr_min_frac`, `lr_decay_epochs` | Cosine LR schedule |
-| `num_threads` | HCNN workers; **1** for deterministic / multi-net hosts |
-| `restore_best_epoch` | Best-epoch restore (default true on Readout; demos often false) |
-| `seed` | HCNN weight init |
+| Field | Meaning |
+|-------|---------|
+| `dim` | Feature cube dim; **0 = auto** (`reservoir.dim` + log₂(B)) |
+| `num_outputs` | Classes, or regression width |
+| `task` | `Classification` or `Regression` |
+| `epochs`, `batch_size` | Batch training |
+| `lr_max`, `lr_min_frac`, `lr_decay_epochs` | Cosine learning-rate schedule |
+| `num_threads` | HCNN workers — use **1** for simple determinism |
+| `restore_best_epoch` | Keep best epoch weights (default true on Readout; demos often false) |
+| `seed` | Readout weight init |
 
-Further architecture fields (`num_layers`, `use_pooling`, `activation`, …) live on
-`ReadoutConfig` in `Readout.h` — same semantics as the HypercubeESN-style readout
-façade. Hosts that only need classification rarely change them.
+Deeper architecture fields (`num_layers`, pooling, activation, …) live on
+`ReadoutConfig` in `Readout.h`. Classification hosts often leave them alone.
 
-### Construct and sizing
+### After construct — sizes and inspection
 
 ```cpp
 explicit WTF(const WTFConfig& cfg);
 
-size_t N() const;            // 2^dim
-size_t T() const;            // resolved drive passes
-size_t B() const;            // readout_slices
-size_t M() const;            // history_depth
-size_t FeatureSize() const;  // B * N
-size_t NumCollected() const;
-size_t NumOutputs() const;
-size_t CollectThreads() const;   // configured preference (0 = auto)
-bool   BypassReservoir() const;
+wtf.N();  wtf.T();  wtf.B();  wtf.M();
+wtf.FeatureSize();      // B * N
+wtf.NumCollected();
+wtf.NumOutputs();
+wtf.CollectThreads();   // what you configured (0 = auto)
+wtf.BypassReservoir();
 
-const Reservoir& reservoir() const;
-const Readout&   readout() const;
-const ReadoutConfig& readout_config() const;  // resolved (dim filled in)
+wtf.reservoir();        // const — e.g. realized spectral radius
+wtf.readout();          // const — weights, save/load helpers
+wtf.readout_config();   // resolved config (dim filled in if auto)
 ```
 
-Construct validates: T > 0 after resolve, B power of two and ≤ M, bypass ⇒ B == 1,
-σ finite and ≥ 0, `readout.dim` auto or exact, `num_outputs ≥ 1`.
+Construction checks the usual mistakes: bad T, B not a power of two, B > M,
+bypass with B ≠ 1, invalid noise σ, wrong readout dim, `num_outputs < 1`.
 
-### Episode and features
+### Run an episode (no training)
 
 ```cpp
-void RunEpisode(std::span<const float> x);   // size N; does not modify x
-std::span<const float> LastFeatures() const; // length FeatureSize()
+wtf.RunEpisode(x);              // x.size() == N; x is not modified
+auto feats = wtf.LastFeatures(); // length FeatureSize()
 ```
 
-| | |
-|--|--|
-| `RunEpisode` | Drive (or bypass copy). Updates `LastFeatures` |
-| `LastFeatures` | Also updated by serial `CollectEpisode`, `Predict`, `PredictClass` |
-| Bulk collect | **Does not** update `LastFeatures` (rows go only into the train set) |
+`LastFeatures` also updates after serial `CollectEpisode`, `Predict`, and
+`PredictClass`. **Bulk `CollectEpisodes` does not touch it** — those features
+only go into the training set.
 
-### Collect → train → predict
+### Collect, train, predict
+
+**Classification**
 
 ```cpp
-// Classification
-void CollectEpisode(std::span<const float> x, int class_label);
-void CollectEpisodes(std::span<const float> fields_flat,
-                     std::span<const int> labels);
-void CollectEpisodes(size_t count, std::span<const int> labels,
-                     const std::function<void(size_t, std::span<float>)>& fill_field);
-
-// Regression
-void CollectEpisode(std::span<const float> x, std::span<const float> target);
-void CollectEpisodes(std::span<const float> fields_flat,
-                     std::span<const float> targets_flat);
-void CollectEpisodes(size_t count, std::span<const float> targets_flat,
-                     const std::function<void(size_t, std::span<float>)>& fill_field);
-
-void ClearCollected();
-void TrainOnCollected();   // keeps samples; retrain OK
-
-std::vector<float> Predict(std::span<const float> x);
-int  PredictClass(std::span<const float> x);   // classification only
-
-double AccuracyOnCollected() const;  // train-set accuracy
-double R2OnCollected() const;        // train-set R²
+wtf.CollectEpisode(x, class_label);           // one sample
+wtf.CollectEpisodes(fields_flat, labels);     // bulk, sample-major
+wtf.CollectEpisodes(count, labels, fill_field); // fill_field(i, span) writes N floats
 ```
 
-| API | Notes |
-|-----|--------|
-| `fields_flat` | Sample-major; length `count * N` |
-| `fill_field(i, field)` | Write N floats; must be safe for concurrent distinct `i` |
-| `collect_threads` | 0 = auto; pool grows to high-water mark for the `WTF` lifetime |
-| `TrainOnCollected` | Requires `NumCollected() > 0`; does not clear the set |
-| Wrong task family | Throws (`invalid_argument` / task guards) |
+**Regression** — same idea with target vectors (`num_outputs` floats per sample).
+
+```cpp
+wtf.ClearCollected();           // drop training rows (keeps worker pool)
+wtf.TrainOnCollected();         // needs at least one sample; does not clear
+
+auto logits = wtf.Predict(x);   // num_outputs floats
+int y = wtf.PredictClass(x);    // classification only
+
+double acc = wtf.AccuracyOnCollected();  // train set
+double r2  = wtf.R2OnCollected();        // train set, regression
+```
+
+Bulk layout notes:
+
+- `fields_flat` is sample-major: sample `i` starts at `i * N`.
+- `fill_field` may run on several samples at once — only touch index `i`’s buffer.
+- Wrong task (class API on a regression net, etc.) throws.
 
 ### Train-input noise
 
-`episode.train_input_noise_sigma > 0` adds i.i.d. Gaussian noise to the field
-**before** the collect episode. Salt is deterministic from `ic_seed` and sample
-index. **`RunEpisode` / `Predict` / `PredictClass` ignore σ.**
+Set `episode.train_input_noise_sigma > 0` to add Gaussian noise to the field
+**only when collecting**. The draw is deterministic from `ic_seed` and the sample
+index. Inference paths ignore σ. Name is deliberate: this is not eval noise.
+
+### Faster bulk collect
+
+`episode.collect_threads`:
+
+- `0` — auto (leaves one or two cores free so the machine stays responsive)
+- `1` — serial
+- `K` — up to K workers
+
+Worker 0 reuses the primary reservoir. Extra workers clone frozen weights once.
+The internal thread pool **grows** for the life of the `WTF` and does not shrink.
 
 ### Bypass reservoir
 
-`episode.bypass_reservoir = true` (and `B == 1`): features = packed field. Use for
-A/B vs orbit. Collect noise still applies when σ > 0.
+`bypass_reservoir = true` (with `B == 1`): features = the field. Collect noise
+still applies when σ > 0. Handy for “does the orbit help?” experiments.
 
 ---
 
-## 7. What is *not* the host surface
+## 7. Please do not
 
-| Item | Why |
-|------|-----|
-| Driving `Reservoir` yourself for product training | Episode contract lives on `WTF` |
-| Calling vendored `hcnn::HCNN` from the app | Readout owns that stack |
-| `examples/common/*` packing / data discovery | Demo recipes only |
-| Streaming `Readout::TrainStep*` on intermediate states | Product samples **end-of-episode** only |
-| External feedback / multi-channel ESN inject | Intentionally **not** ported |
+| Temptation | Better path |
+|------------|-------------|
+| Drive `Reservoir` yourself for product training | Use `WTF` episodes |
+| Call vendored `hcnn::HCNN` from the app | Let `Readout` own it; export via `wtf.readout()` if needed |
+| Depend on `examples/common` in production | Copy the idea; own your packing |
+| Stream intermediate passes into the readout | Product samples **end of episode only** |
+| Expect ESN-style external feedback | Not ported on purpose |
 
-**Advanced but still public types:** `Reservoir` and `Readout` headers exist so
-`WTFConfig` and `wtf.readout()` / `wtf.reservoir()` work. Prefer WTF collect/train
-for the product path. Use `readout().Weights()` / `SaveHcnnModel` when you need
-export; use `reservoir().GetRealizedSpectralRadius()` for logging.
+`Reservoir` and `Readout` headers are public so config and inspection work. The
+happy path is still collect → train → predict on **`WTF`**.
 
 ---
 
-## 8. Training loop pattern (demos)
+## 8. Demos as recipes
 
-In-tree demos keep knobs in one place (`MakeWTFConfig` + demo-only `k*` constants):
+Demos keep product knobs in `MakeWTFConfig()` and demo-only constants (`k*`)
+beside them:
 
 ```text
-MakeWTFConfig()          // product WTFConfig
-→ WTF wtf(cfg)
-→ CollectEpisodes / CollectEpisode
-→ TrainOnCollected
-→ held-out or train-set metrics
-→ PredictClass
+config → WTF → collect → train → score → predict
 ```
 
-| Demo | Role |
-|------|------|
-| `tests/wtf_smoke.cpp` | Contract gate (sizes, determinism, parallel collect, noise, bypass) |
-| `examples/synth/wtf_synth.cpp` | Fast multi-class CI without data files |
-| `examples/mnist/wtf_mnist.cpp` | MNIST pack → orbit → readout (+ optional A/B knobs) |
+| Demo | When to open it |
+|------|-----------------|
+| `tests/wtf_smoke.cpp` | Contracts: sizes, determinism, parallel collect, noise, bypass |
+| `examples/synth/wtf_synth.cpp` | Fast multi-class without data files |
+| `examples/mnist/wtf_mnist.cpp` | Real packing + larger train loop |
 
-See [`examples/README.md`](../examples/README.md).
-
----
-
-## 9. Memory, threading, performance
-
-| Topic | Guidance |
-|-------|----------|
-| **Exclusive instance** | Do not share one `WTF` across host threads for concurrent public calls |
-| **Bulk collect** | Internal fork-join; worker 0 reuses primary reservoir; others clone weights once |
-| **Pool lifetime** | Collect thread pool grows; does not shrink until `WTF` destroys |
-| **HCNN threads** | `readout.num_threads = 1` when you already parallelize across many `WTF`s |
-| **Cost** | Orbit cost scales with `T * N`; feature size `B * N`; HCNN cost with dim/channels |
-| **Release** | Prefer Release builds for study numbers (`-ffast-math` recipes) |
+More context: [`examples/README.md`](../examples/README.md).
 
 ---
 
-## 10. Pitfalls checklist
+## 9. Threads, memory, and cost (short)
 
-| Pitfall | Fix |
-|---------|-----|
-| Field length ≠ N | Pack to capacity; check `wtf.N()` |
-| Expect free input size (not 2^dim) | Capacity is the cube; pack in the host |
-| Softmax in `Predict` | Don’t; use logits + `PredictClass` / argmax |
-| Train noise on eval | σ is collect-only; eval uses clean `Predict*` |
-| `LastFeatures` after `CollectEpisodes` | Bulk path does not update it — use serial collect or re-`RunEpisode` |
-| `AccuracyOnCollected` as held-out | It is train-set; score held-out yourself |
-| `B` not power of two / `B > M` | Construct throws |
-| Bypass with `B != 1` | Construct throws |
-| Concurrent public use of one `WTF` | Exclusive instance; use bulk collect for parallelism |
-| Treat packing as the product | Core is episode + readout; packing is host-owned |
-| Link HCNN instead of WTF | Link `HypercubeWTFCore`; include `WTF.h` |
+- Treat one `WTF` as **exclusive** for public calls.
+- Bulk collect is where parallelism belongs; it clones reservoirs as needed.
+- Orbit cost grows with `T × N`; features are `B × N`; the CNN scales with its
+  own dim and channels.
+- If you already run many `WTF` instances in parallel, set
+  `readout.num_threads = 1` so HCNN does not oversubscribe the machine.
+- Prefer Release when comparing accuracies across runs.
 
 ---
 
-## 11. Private / non-product details
+## 10. Common mistakes
 
-| Area | Role |
-|------|------|
-| `WTF::CollectPool` / workers | Internal parallel collect |
-| Vendored `HCNNNetwork` / layers / `ThreadPool` | HCNN private (see HypercubeCNN docs) |
-| Reservoir weight layout | Frozen draw ABI; not a host tuning surface mid-run |
-
-**Boundary policy:**
-
-1. **Hosts integrate `WTF`.** Config structs at construct; collect → train → predict.
-2. **Examples are not the SDK.** Copy recipes, not dependency on `examples/common` in production if you can avoid it.
-3. **Features land on `WTF` first.** Deep reservoir/readout knobs are pre-construct config, not a second runtime product.
-
----
-
-## 12. Further reading in this repo
-
-| Doc / path | Content |
-|------------|---------|
-| [`project.md`](project.md) | Charter, locked design, workplan |
-| [`../examples/README.md`](../examples/README.md) | Demo map + MNIST data appendix |
-| [`../third_party/HypercubeCNN/VENDORED.md`](../third_party/HypercubeCNN/VENDORED.md) | HCNN pin |
-| HypercubeCNN `docs/CPP_SDK.md` (upstream) | Readout’s underlying CNN contracts |
+| Symptom / assumption | Fix |
+|----------------------|-----|
+| Throw on collect / run | Field length must equal `wtf.N()` |
+| “Why can’t I pass 784 floats?” | Pack to N first |
+| Softmax inside `Predict` | You get logits; use `PredictClass` or argmax |
+| Eval looks noisy after setting σ | σ is collect-only |
+| `LastFeatures` empty after bulk collect | Expected — re-run `RunEpisode` if you need them |
+| Great train accuracy, bad real test | `AccuracyOnCollected` is the training set |
+| Construct fails on B | Power of two, and `B ≤ M` |
+| Construct fails on bypass | Needs `B == 1` |
+| Racey results with shared `WTF` | One instance, one host thread of control |
+| Linked HypercubeCNN only | Link `HypercubeWTFCore`, include `WTF.h` |
 
 ---
 
-## 13. One-page cheat sheet
+## 11. Further reading
+
+| Doc | What it is |
+|-----|------------|
+| [project.md](project.md) | Charter — why WTF exists, locked design |
+| [examples/README.md](../examples/README.md) | Demo map and MNIST data notes |
+| [VENDORED.md](../third_party/HypercubeCNN/VENDORED.md) | Which HypercubeCNN pin is in tree |
+| HypercubeCNN’s own C++ SDK (upstream) | Deep CNN contracts if you dig into the readout |
+
+---
+
+## 12. Cheat sheet
 
 ```text
 #include "HypercubeWTF.h"
 
 WTFConfig cfg;
-cfg.reservoir.dim = 7;              // N = 128
+cfg.reservoir.dim = 7;                 // N = 128
 cfg.reservoir.history_depth = 8;
 cfg.reservoir.seed = 1;
 cfg.ic_seed = 2;
-cfg.episode.T = 0;                  // → N
-cfg.episode.readout_slices = 1;     // B
+cfg.episode.T = 0;                     // → N
+cfg.episode.readout_slices = 1;        // B
 cfg.episode.train_input_noise_sigma = 0.f;
 cfg.episode.bypass_reservoir = false;
-cfg.readout.dim = 0;                // auto dim + log2(B)
+cfg.readout.dim = 0;                   // auto
 cfg.readout.num_outputs = K;
 cfg.readout.task = ReadoutTask::Classification;
 cfg.readout.epochs = 100;
@@ -543,19 +566,15 @@ cfg.readout.num_threads = 1;
 
 WTF wtf(cfg);
 
-// Collect (sample-major fields_flat: count * N)
-wtf.CollectEpisodes(fields_flat, labels);
+wtf.CollectEpisodes(fields_flat, labels);   // count * N floats, sample-major
 wtf.TrainOnCollected();
 
-// Infer (clean episode)
-int y = wtf.PredictClass(x_span);
-auto logits = wtf.Predict(x_span);
+int y = wtf.PredictClass(x);
+auto logits = wtf.Predict(x);
 
-// Episode-only / inspection
-wtf.RunEpisode(x_span);
-auto feats = wtf.LastFeatures();     // B*N
+wtf.RunEpisode(x);
+auto feats = wtf.LastFeatures();            // B * N
 float sr = wtf.reservoir().GetRealizedSpectralRadius();
 ```
 
-**Dependencies:** C++23 + threads; vendored HypercubeCNN inside the readout.  
-**Product hinge:** static field → frozen orbit → end features → trained HCNN.
+**In one line:** pack a field → frozen orbit → end features → train the CNN head.
