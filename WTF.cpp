@@ -42,6 +42,9 @@ void add_gaussian_noise(const float* x, float* y, size_t n, float sigma,
 // the calling thread is tid 0; workers 1..nthreads-1 take the other chunks.
 // Extra parked workers (pool larger than this job) wait out the generation
 // without touching active_.
+//
+// Not re-entrant: do not call ForEach from a fill_field / episode callback
+// that already runs inside ForEach on this pool.
 // ---------------------------------------------------------------------------
 
 struct WTF::CollectPool

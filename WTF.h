@@ -22,13 +22,14 @@ struct EpisodeConfig
 
     /// Parallel workers for @ref WTF::CollectEpisodes (each owns a Reservoir
     /// with the same frozen weights). 0 = auto (desktop-friendly: leave 1–2
-    /// cores free for the OS/UI), 1 = serial, N = N workers (pin for max burn).
+    /// cores free for the OS/UI), 1 = serial, K = K workers (pin for max burn).
     /// Single-sample @ref CollectEpisode is always serial on the primary.
     ///
     /// Auto policy: max(1, hw − 1), or max(1, hw − 2) when hw ≥ 8.
     /// Worker 0 reuses the primary reservoir (no extra weight copy). Workers
-    /// 1..N-1 are full clones. A persistent thread pool is kept for the WTF
-    /// lifetime so bulk collects do not re-spawn OS threads each call.
+    /// 1..K-1 are full clones. A persistent thread pool is kept for the WTF
+    /// lifetime (grows to the high-water mark; does not shrink) so bulk collects
+    /// do not re-spawn OS threads each call.
     size_t collect_threads = 0;
 
     /// Train/collect-only i.i.d. Gaussian noise on the length-N field before
@@ -58,11 +59,16 @@ struct WTFConfig
 
 /// @brief HypercubeWTF: static length-N field → driven reservoir orbit → HCNN.
 ///
-/// Episode: @ref RunEpisode / @ref CollectEpisode. Batch train: @ref TrainOnCollected.
-/// Inference: @ref Predict / @ref PredictClass (each runs a fresh episode).
+/// Typical lifecycle: @ref CollectEpisode / @ref CollectEpisodes →
+/// @ref TrainOnCollected → @ref Predict / @ref PredictClass.
+/// Episode: @ref RunEpisode (or collect APIs). Inference each runs a fresh episode
+/// (no train-input noise).
 ///
 /// Bulk collection (@ref CollectEpisodes) fans out independent episodes across
 /// worker reservoirs — episode start does not depend on prior episode state.
+///
+/// One @ref WTF instance is not thread-safe for concurrent public calls from
+/// multiple host threads. Parallelism is internal to bulk @ref CollectEpisodes.
 class WTF
 {
 public:
@@ -92,7 +98,11 @@ public:
     /// After return, @ref LastFeatures holds the feature pack (B*N).
     void RunEpisode(std::span<const float> x);
 
-    /// End features from the most recent successful @ref RunEpisode (length B*N).
+    /// Feature pack (length B*N) from the most recent successful path that runs
+    /// an episode into the primary buffer: @ref RunEpisode, serial
+    /// @ref CollectEpisode, @ref Predict, or @ref PredictClass.
+    /// Not updated by bulk @ref CollectEpisodes (features go only into the
+    /// collected training set).
     [[nodiscard]] std::span<const float> LastFeatures() const { return last_features_; }
 
     /// True when the reservoir orbit is skipped (field → readout).
@@ -102,50 +112,63 @@ public:
     /// Does not free collect-worker reservoirs or the collect thread pool.
     void ClearCollected();
 
-    /// @ref RunEpisode then append features + class label (classification task).
-    /// @p class_label must be in [0, NumOutputs()). Serial (primary reservoir).
+    /// One collect episode, then append features + class label (classification).
+    /// Applies @ref EpisodeConfig::train_input_noise_sigma when > 0, then the
+    /// same episode path as @ref RunEpisode (including bypass). Updates
+    /// @ref LastFeatures. @p class_label must be in [0, NumOutputs()).
+    /// Serial (primary reservoir).
     void CollectEpisode(std::span<const float> x, int class_label);
 
-    /// @ref RunEpisode then append features + regression targets.
-    /// @p target must have length NumOutputs(). Serial (primary reservoir).
+    /// One collect episode, then append features + regression targets.
+    /// Same noise / episode / @ref LastFeatures rules as the classification
+    /// overload. @p target must have length NumOutputs(). Serial (primary).
     void CollectEpisode(std::span<const float> x, std::span<const float> target);
 
     /// Parallel bulk collect (classification). @p fields_flat is sample-major,
     /// length count * N; @p labels length count. Appends count episodes.
     /// Fields are read zero-copy (drive remap still uses per-worker scratch).
+    /// Does not update @ref LastFeatures.
     void CollectEpisodes(std::span<const float> fields_flat,
                          std::span<const int> labels);
 
     /// Parallel bulk collect (classification) with a pack/fill callback.
     /// For each sample index i, @p fill_field(i, field) must write N floats
     /// into @p field (thread-safe for concurrent calls on distinct i).
+    /// Does not update @ref LastFeatures.
     void CollectEpisodes(size_t count,
                          std::span<const int> labels,
                          const std::function<void(size_t, std::span<float>)>& fill_field);
 
     /// Parallel bulk collect (regression). @p fields_flat length count * N;
     /// @p targets_flat length count * NumOutputs() (sample-major).
+    /// Does not update @ref LastFeatures.
     void CollectEpisodes(std::span<const float> fields_flat,
                          std::span<const float> targets_flat);
 
     /// Parallel bulk collect (regression) with pack/fill callback.
+    /// Does not update @ref LastFeatures.
     void CollectEpisodes(size_t count,
                          std::span<const float> targets_flat,
                          const std::function<void(size_t, std::span<float>)>& fill_field);
 
     /// Batch-train the HCNN on all collected episodes (requires NumCollected() > 0).
+    /// Does not clear the collected set — call again to retrain, or
+    /// @ref ClearCollected first to start over.
     void TrainOnCollected();
 
-    /// Episode + readout forward; returns NumOutputs() floats (logits or regression).
+    /// Fresh episode + readout forward; returns NumOutputs() floats (logits or
+    /// regression). No train-input noise. Updates @ref LastFeatures.
     [[nodiscard]] std::vector<float> Predict(std::span<const float> x);
 
-    /// Episode + argmax class (classification task only).
+    /// Fresh episode + argmax class (classification task only).
+    /// No train-input noise. Updates @ref LastFeatures.
     [[nodiscard]] int PredictClass(std::span<const float> x);
 
-    /// Accuracy of the trained readout on the collected set (classification).
+    /// Accuracy of the trained readout on the collected (training) set —
+    /// not a held-out metric (classification).
     [[nodiscard]] double AccuracyOnCollected() const;
 
-    /// R² on the collected set (regression).
+    /// R² on the collected (training) set — not held-out (regression).
     [[nodiscard]] double R2OnCollected() const;
 
 private:
