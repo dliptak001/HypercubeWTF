@@ -1,19 +1,32 @@
 /// @file wtf_mnist.cpp
 /// @brief MNIST → pack length-N field → WTF episode → train end-state readout.
 ///
-/// Packing is example-owned and uses vendored HCNN SpatialEmbed modes:
-///   PadLow       — full 28x28 in [0,784), pad [784,N) (needs N >= 784).
-///   PadLowCenter — full 28x28 + centered crop in the tail (default; dim=10
-///                  fills N exactly with a 15x16 center at (6,6)).
+/// Pipeline: IDX load → (train-only optional 28×28 aug) → pack → CollectEpisodes
+/// → TrainOnCollected → held-out pack (+ optional field AWGN) → PredictClass.
+/// Train set = MNIST train IDX (kMaxTrain); held-out = t10k (kMaxTest).
 ///
-/// Train collect only: optional HCNNSpatialAug on 28x28, then pack.
-/// Test is never geometrically augmented. Optional demo-only i.i.d. Gaussian on
-/// the packed test field (kTestNoiseSigma) is an eval protocol — not WTF core
-/// and not episode.train_input_noise_sigma (collect-only). Prefer one noise source at
-/// a time when comparing (leave collect/aug noise at 0 for clean test-noise A/B).
+/// Packing is example-owned (vendored HCNN SpatialEmbed):
+///   PadLow       — full 28×28 in [0,784), pad [784,N) (needs N >= 784).
+///   PadLowCenter — full 28×28 + centered crop in the tail (default; dim=10
+///                  fills N exactly with a 15×16 center at (6,6)).
 ///
-/// Data: this repo's data/ (discovered via cwd / exe / source tree).
-/// Edit knobs in the sections below.
+/// Main A/B levers (prefer one experimental factor at a time):
+///   episode.bypass_reservoir — false = frozen orbit (default story);
+///                              true  = pack field → readout (needs B=1).
+///   kTestNoiseSigma          — held-out i.i.d. Gaussian on packed length-N
+///                              field after pack (eval protocol only).
+///   kTrainAug                — train-only geometric/pixel corruptor on 28×28
+///                              before pack (not a recommended product path).
+///   episode.train_input_noise_sigma — collect/train field noise inside WTF
+///                              (not kTestNoiseSigma; not held-out).
+/// Prefer a single noise source when comparing (leave the others at 0).
+///
+/// Runtime logs print pack=, aug=, and test_noise= lines for scan-friendly diffs.
+/// Narratives: examples/mnist/WhiteNoiseFilter.md,
+///             examples/mnist/TrainingDataQualitySensitivity.md.
+///
+/// Data: C:\HypercubeWTF\data only (not the CLion clone's data/).
+/// Knobs: MakeWTFConfig() = product WTFConfig; k* below = demo-only.
 
 #include "WTF.h"
 #include "done_beep.h"
@@ -66,25 +79,6 @@ static const char* PackModeName(PackMode pack)
 // =============================================================================
 // WTF configuration — primary knobs for this demo (edit here)
 // =============================================================================
-//
-// Live MakeWTFConfig() snapshot (keep this comment in sync when you edit below):
-//   reservoir: dim=10 N=1024  M=4  seed=13871537636959942979
-//              SR_target=0.4  leak=0.5  in_scale=0.005  bias_scale=0
-//   episode:   T=20  B=1  ic_seed=12  train_input_noise_sigma=0  bypass_reservoir=false
-//   readout:   seed=42  dim=0(auto)  num_outputs=10  num_layers=1  channel_growth=1
-//              pooling=max  conv_channels=16  activation=NONE  task=classification
-//              epochs=100  batch_size=64  lr_max=0.0015  lr_min_frac=0.01
-//              lr_decay_epochs=0  weight_decay=0  num_threads=0(auto)
-//              restore_best_epoch=true  optimizer=Adam  best_epoch_holdout_frac=0.1
-//
-// Demo pack / noise (outside WTFConfig; see k* below): pack=PadLowCenter,
-//   train=60000 test=10000, aug=off, kTestNoiseSigma / kTestNoiseSeedBase.
-//
-// Measured bypass vs reservoir (see examples/mnist/WhiteNoiseFilter.md):
-//   clean: reservoir ≈ bypass (test_acc≈0.979)
-//   AWGN σ=0.5 on packed field (multi-seed): reservoir≈0.93 vs bypass≈0.85
-// =============================================================================
-
 static WTFConfig MakeWTFConfig()
 {
     WTFConfig cfg;
@@ -97,7 +91,6 @@ static WTFConfig MakeWTFConfig()
     cfg.reservoir.input_scaling = 0.005;
     cfg.reservoir.leak_rate  = 0.5;
     cfg.reservoir.bias_scaling  = 0.0;
-    cfg.reservoir.verbose       = false;
 
     // Episode IC (separate from weight seed)
     cfg.ic_seed = 12;
@@ -105,10 +98,11 @@ static WTFConfig MakeWTFConfig()
     // Episode: T = 0 means default T = N
     cfg.episode.T              = 20;
     cfg.episode.readout_slices = 1;
-    // Keep 0 when train aug N(0,σ) is on — do not stack two noise sources.
+    // Collect/train only. Keep 0 when kTrainAug pixel noise or kTestNoise A/B
+    // is the factor under study — do not stack noise sources.
     cfg.episode.train_input_noise_sigma = 0.0f;
-    // true = pack field → readout (no orbit); PackMode still applies. Needs B=1.
-    cfg.episode.bypass_reservoir  = true;
+    // false = frozen orbit (default). true = pack → readout (no orbit); B=1.
+    cfg.episode.bypass_reservoir  = false;
 
     // Readout (trainable HCNN)
     cfg.readout.seed                    = 42;
@@ -120,7 +114,7 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.conv_channels           = 16;
     cfg.readout.activation              = ReadoutActivation::NONE;
     cfg.readout.task                    = ReadoutTask::Classification;
-    cfg.readout.epochs                  = 100; //100 for orbit; 20 for bypass;
+    cfg.readout.epochs                  = 100; // full orbit recipe; ~20 is enough for bypass
     cfg.readout.batch_size              = 64;
     // Cosine LR: peak → floor = lr_max * lr_min_frac over lr_decay_epochs (0 = epochs)
     cfg.readout.lr_max                  = 0.0015f;
@@ -140,14 +134,15 @@ static WTFConfig MakeWTFConfig()
 // =============================================================================
 
 static constexpr PackMode kPack       = PackMode::PadLowCenter;
-static constexpr size_t kMaxTrain     = 60000; // short default; campaign: 20000 / 0=all
-static constexpr size_t kMaxTest      = 10000;
+static constexpr size_t kMaxTrain     = 60000; // 0 = all in file; smaller for quick smokes
+static constexpr size_t kMaxTest      = 10000; // held-out (t10k); 0 = all in file
 static constexpr float kPad           = -1.0f;
 static constexpr int kImgSide         = 28;
 static constexpr int kImgPixels       = kImgSide * kImgSide;
-static constexpr double kMinTestAcc   = 0.50; // soft CI floor
+static constexpr double kMinTestAcc   = 0.50; // soft CI / smoke floor (not the recipe bar)
 
-// Train-only 2D aug (HCNNSpatialAug), then PackMode. Test is never augmented.
+// Train-only 2D aug (HCNNSpatialAug) on 28×28, then PackMode.
+// Held-out is never geometrically augmented.
 // Report line format (when on):
 //   aug=rot+/-12+scale[0.9,1.1]+shift+/-2+shear_x+/-0.15+shear_y+/-0+elastic(a=0,s=5)+N(0,0.03)
 static constexpr bool  kTrainAug         = false;
@@ -162,12 +157,13 @@ static constexpr float kAugElasticSigma  = 5.0f; // ignored when alpha == 0
 static constexpr float kAugNoiseSigma    = 0.03f;
 static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
 
-// Test-only protocol: N(0,σ) on the packed length-N field after PackSample,
-// before PredictClass. 0 = off (default). Independent of train aug and of
-// episode.train_input_noise_sigma. Deterministic per sample from kTestNoiseSeedBase.
-// High-noise bypass A/B: try σ in ~0.3–0.5 on [-1,1]-ish packed fields.
+// Held-out protocol: N(0,σ) on the packed length-N field after PackSample,
+// before PredictClass. Not clamped (field may leave [-1,1]). 0 = off (default).
+// Independent of kTrainAug and of episode.train_input_noise_sigma.
+// Deterministic per sample from kTestNoiseSeedBase + index.
+// High-noise orbit vs bypass: try σ in ~0.3–0.5 (see WhiteNoiseFilter.md).
 static constexpr float    kTestNoiseSigma    = 0.0f;
-static constexpr unsigned kTestNoiseSeedBase = 0x7E57u; //0x7E57u;
+static constexpr unsigned kTestNoiseSeedBase = 0x7E57u;
 
 // =============================================================================
 // Helpers
@@ -227,7 +223,7 @@ static void PrintTestNoiseReport()
                     static_cast<double>(kTestNoiseSigma), kTestNoiseSeedBase);
 }
 
-/// Test path: raw 28x28 → pack (no geometric aug). Optional field noise is
+/// Held-out path: raw 28×28 → pack (no geometric aug). Optional field AWGN is
 /// applied in the eval loop after this returns.
 static void PackSample(const wtf_ex::MnistSample& s,
                        std::span<float> field,
@@ -238,7 +234,7 @@ static void PackSample(const wtf_ex::MnistSample& s,
     wtf_ex::PackMnist28(s.pixels.data(), emb, field);
 }
 
-/// In-place i.i.d. Gaussian on a packed field. No-op when kTestNoiseSigma <= 0.
+/// In-place i.i.d. Gaussian on a packed field (no clamp). No-op if σ <= 0.
 static void AddTestFieldNoise(std::span<float> field, size_t sample_index)
 {
     if (kTestNoiseSigma <= 0.0f)
@@ -250,7 +246,7 @@ static void AddTestFieldNoise(std::span<float> field, size_t sample_index)
         v += dist(rng);
 }
 
-/// Train collect path: optional aug on 28x28, then pack.
+/// Train collect path: optional aug on 28×28, then pack.
 /// Parallel-safe: thread_local 784 scratch; per-sample RNG (no shared engine).
 static void PackTrainSample(const wtf_ex::MnistSample& s,
                             std::span<float> field,
@@ -266,8 +262,6 @@ static void PackTrainSample(const wtf_ex::MnistSample& s,
     {
         // Geometry requires in != out; one scratch buffer per worker thread.
         thread_local std::vector<float> scratch(static_cast<size_t>(kImgPixels));
-        if (scratch.size() != static_cast<size_t>(kImgPixels))
-            scratch.assign(static_cast<size_t>(kImgPixels), 0.0f);
 
         std::mt19937 rng(kAugSeedBase
                          + static_cast<unsigned>(sample_index) * 9973u);
@@ -367,8 +361,8 @@ int main(int argc, char** argv)
             size_t correct = 0;
             for (size_t i = 0; i < test.size(); ++i)
             {
-                PackSample(test.samples[i], field, emb); // no geometric aug
-                AddTestFieldNoise(field, i);             // optional eval protocol
+                PackSample(test.samples[i], field, emb); // held-out: no geo aug
+                AddTestFieldNoise(field, i);             // optional held-out field AWGN
                 if (wtf.PredictClass(field) == test.samples[i].label)
                     ++correct;
             }
@@ -404,7 +398,7 @@ int main(int argc, char** argv)
     {
         std::fprintf(stderr, "wtf_mnist: %s\n", e.what());
         std::fprintf(stderr,
-                     "Place uncompressed MNIST IDX files in HypercubeWTF/data/:\n"
+                     "Place uncompressed MNIST IDX files in C:\\HypercubeWTF\\data\\:\n"
                      "  train-images-idx3-ubyte  train-labels-idx1-ubyte\n"
                      "  t10k-images-idx3-ubyte   t10k-labels-idx1-ubyte\n"
                      "See data/README.md\n");
