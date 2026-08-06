@@ -86,7 +86,8 @@ the cube is in scope for the same idea.
 **Hypothesis (confirmed on this survey):** under **strong AWGN on the held-out
 packed field**, the reservoir path is **less sensitive** to training-data
 quality than bypass; under a **clean held-out set**, both paths are **about
-equally sensitive** (small, similar drops).
+equally sensitive** (small, similar drops). Differences below are in
+**percentage points (pp)**.
 
 | Held-out condition | Reservoir vs degraded training set | Bypass vs degraded training set |
 |--------------------|------------------------------------|---------------------------------|
@@ -153,28 +154,24 @@ About **1 pp** lost on each path — equally sensitive under a clean held-out se
 
 ## Picture in one view
 
-| | Clean training set | Corrupted training set |
-|--|--------------------|------------------------|
-| **Clean held-out** | Both strong (~0.98); ~parity | Both still strong (~0.97); ~parity |
-| **Held-out AWGN σ = 0.5** | Reservoir ~0.93, bypass ~0.83 | Reservoir ~0.84, bypass ~0.65 |
+Rows = held-out condition; columns = training-data quality. Each cell:
+**held-out accuracy** then **takeaway**.
 
-```text
-                         clean held-out       held-out AWGN (σ=0.5)
-clean training set       parity               reservoir ahead
-corrupted training set   parity (small tax)   reservoir much more tolerant
-```
+| | **Clean training set** | **Corrupted training set** |
+|:---|:---|:---|
+| **Clean held-out** | ~0.98 / ~0.98 — **parity** | ~0.97 / ~0.97 — **parity** (small tax) |
+| **Held-out AWGN (σ = 0.5)** | ~0.93 / ~0.83 — **reservoir ahead** | ~0.84 / ~0.65 — **reservoir much more tolerant** |
+
+Within each cell, order is **reservoir / bypass**.
 
 ---
 
 ## What this evaluation does not claim
 
-- That the logged spatial-aug recipe is good augmentation or a recommended
+- That the logged spatial-aug recipe represents good augmentation or a recommended
   training path (it is used here only as a **corruptor** of the training data
   set; dim-10 results do not endorse using the SDK spatial-aug facility that way).
-- Multi-seed coverage of every cell (one noise seed).
-- Other training-set corruptors (e.g. matched AWGN on the training set), other
-  datasets, or a full recipe sweep.
-- Anything beyond **training-data quality sensitivity** (bypass vs reservoir).
+- Multi-seed coverage of every cell (this was a quick, one noise seed study).
 
 What it **does** support: under strong AWGN on the held-out packed field,
 degrading the **training data set** hurts **bypass more** than **reservoir**;
@@ -184,28 +181,39 @@ under a clean held-out set, both take a small, similar hit.
 
 ## Appendix A — Logged recipe (reproducibility only)
 
-Not the product claim — settings for the tables below.
+Not the product claim — settings for the tables below. When the reservoir is
+**on**, reservoir and episode knobs apply; bypass uses the same pack and readout
+and **ignores** reservoir dynamics.
 
-```text
-N=1024  T=20  B=1  M=4  ic_seed=12
-reservoir.seed=13871537636959942979
-SR_target=0.4  SR_realized≈0.3988  leak=0.5  in_scale=0.005  bias_scale=0
-readout: layers=1  weights=82122  pooling=max  activation=NONE  lr_max=0.0015
-pack=PadLowCenter  train=60000  test=10000
-train_input_noise_sigma=0
-```
+| Meaning | Where in config / demo | Value used |
+|---------|------------------------|------------|
+| Hypercube dimension (field length *N* = 2<sup>dim</sup>) | `reservoir.dim` | 10 (*N* = 1024) |
+| Episode length (drive steps) | `episode.T` | 20 |
+| End-state slices into the readout | `episode.readout_slices` | 1 |
+| Reservoir delay-line depth | `reservoir.history_depth` | 4 |
+| Frozen episode initial-condition seed | `ic_seed` | 12 |
+| Frozen reservoir weight seed | `reservoir.seed` | 13871537636959942979 |
+| Target spectral radius (recurrent block) | `reservoir.spectral_radius` | 0.4 (realized ≈ 0.399) |
+| Leak rate | `reservoir.leak_rate` | 0.5 |
+| Input drive strength | `reservoir.input_scaling` | 0.005 |
+| Per-vertex bias scale | `reservoir.bias_scaling` | 0 (off) |
+| Train/collect field noise | `episode.train_input_noise_sigma` | 0 (off) |
+| HCNN depth / channels / pool / activation | `readout.*` | 1 layer, 16 channels, max pool, none |
+| Readout peak learning rate | `readout.lr_max` | 0.0015 |
+| Readout training epochs | `readout.epochs` | **100** (reservoir on); **20** (bypass arms) |
+| Readout weight count (result of that layout) | — | 82122 |
+| MNIST packing mode | demo pack mode | PadLowCenter |
+| Training / held-out set sizes | demo limits | 60000 / 10000 |
 
-Readout epochs in these logs: **100** when reservoir on; **20** on most bypass
-arms (one clean-bypass log used 100). Factor under study remains training-data
-quality × held-out noise × bypass vs reservoir.
+**Corrupted training set** (demo spatial aug, training only): rotation ±12°,
+scale [0.9, 1.1], shift ±2 px, shear_x ±0.15, shear_y 0, elastic off, additive
+image noise σ = 0.03 — applied on 28×28 **before** pack.
 
-**Corrupted training-set aug string:**
-`rot+/-12+scale[0.9,1.1]+shift+/-2+shear_x+/-0.15+shear_y+/-0+elastic(a=0,s=5)+N(0,0.03)`
-on 28×28 before pack.
+**Held-out AWGN** (evaluation only): Gaussian σ = 0.5 on the packed field; noise
+seed base `0x7E57`.
 
-**Held-out AWGN:** `N(0,0.5)` on packed field, `seed_base=0x7E57` (operator
-header text “0.05” is inconsistent with the run banners; tables use the logged
-σ = 0.5).
+Factor under study: training-data quality × held-out noise × bypass vs
+reservoir.
 
 ---
 

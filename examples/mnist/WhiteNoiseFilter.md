@@ -87,8 +87,8 @@ and substantially outperforms pack-only under strong white test noise.**
 | Clean or mild AWGN | Strong (~0.98) | Matchable (~0.98 when tuned; see below) |
 | Strong AWGN (σ = 0.5) | Collapses (~0.85) | Holds (~0.93) |
 
-The gap at σ = 0.5 is about **eight to nine percentage points**, stable across
-noise seeds. That is the product-relevant result.
+The gap at σ = 0.5 is about **eight to nine percentage points (pp)**, stable
+across noise seeds. That is the product-relevant result.
 
 ---
 
@@ -200,19 +200,31 @@ sees a cleaner cube field.
 ## Appendix A — Logged recipe (reproducibility only)
 
 Not part of the product claim — the settings used for the tables below. When the
-reservoir is **on**, knobs apply; bypass uses the same pack/readout/noise
-protocol and ignores reservoir dynamics.
+reservoir is **on**, reservoir and episode knobs apply; bypass uses the same pack
+and readout and **ignores** reservoir dynamics.
 
-```text
-N=1024  T=20  B=1  M=4  ic_seed=12
-reservoir.seed=13871537636959942979
-SR_target=0.4  SR_realized≈0.3988  leak=0.5  in_scale=0.005  bias_scale=0
-readout: layers=1  weights=82122  pooling=max  activation=NONE
-         lr_max=0.0015  epochs=100
-pack=PadLowCenter  train=60000  test=10000  aug=off
-```
+| Meaning | Where in config / demo | Value used |
+|---------|------------------------|------------|
+| Hypercube dimension (field length *N* = 2<sup>dim</sup>) | `reservoir.dim` | 10 (*N* = 1024) |
+| Episode length (drive steps) | `episode.T` | 20 |
+| End-state slices into the readout | `episode.readout_slices` | 1 |
+| Reservoir delay-line depth | `reservoir.history_depth` | 4 |
+| Frozen episode initial-condition seed | `ic_seed` | 12 |
+| Frozen reservoir weight seed | `reservoir.seed` | 13871537636959942979 |
+| Target spectral radius (recurrent block) | `reservoir.spectral_radius` | 0.4 (realized ≈ 0.399) |
+| Leak rate | `reservoir.leak_rate` | 0.5 |
+| Input drive strength | `reservoir.input_scaling` | 0.005 |
+| Per-vertex bias scale | `reservoir.bias_scaling` | 0 (off) |
+| Train/collect field noise | `episode.train_input_noise_sigma` | 0 (off) |
+| HCNN depth / channels / pool / activation | `readout.*` | 1 layer, 16 channels, max pool, none |
+| Readout peak learning rate | `readout.lr_max` | 0.0015 |
+| Readout training epochs | `readout.epochs` | 100 (some older rows used other budgets) |
+| Readout weight count (result of that layout) | — | 82122 |
+| MNIST packing mode | demo pack mode | PadLowCenter |
+| Training / held-out set sizes | demo limits | 60000 / 10000 |
+| Training spatial augmentation | demo | off |
 
-Some σ = 0.5 multi-seed rows used minor readout variants; reservoir test
+Some σ = 0.5 multi-seed rows used minor readout variants; reservoir held-out
 accuracy remained ~0.93. Factor under study: **bypass vs reservoir**.
 
 ---
