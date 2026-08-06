@@ -58,8 +58,8 @@ sensitivity to training data quality when noise is present. For the details, see
 [TrainingDataQualitySensitivity.md](../examples/mnist/TrainingDataQualitySensitivity.md).
 
 Whether this dynamical encoding → CNN pipeline has real product value is still
-open. We are exploring it as a new technique on static fields — and if that kind
-of open question interests you, you are in the right place.
+an open question. We are exploring it as a new technique on static fields — and
+if that kind of open question interests you, you are in the right place.
 
 ---
 
