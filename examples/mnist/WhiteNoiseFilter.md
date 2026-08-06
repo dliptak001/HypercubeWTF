@@ -225,7 +225,7 @@ and readout and **ignores** reservoir dynamics.
 | Train/collect field noise | `episode.train_input_noise_sigma` | 0 (off) |
 | HCNN depth / channels / pool / activation | `readout.*` | 1 layer, 16 channels, max pool, none |
 | Readout peak learning rate | `readout.lr_max` | 0.0015 |
-| Readout training epochs | `readout.epochs` | 100 (some older rows used other budgets) |
+| Readout training epochs | `readout.epochs` | **100** (reservoir on); **20** (bypass arms) |
 | Readout weight count (result of that layout) | — | 82122 |
 | MNIST packing mode | demo pack mode | PadLowCenter |
 | Training / held-out set sizes | demo limits | 60000 / 10000 |

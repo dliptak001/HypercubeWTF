@@ -1,6 +1,17 @@
 /// @file wtf_synth.cpp
-/// @brief Synthetic multi-class fields → WTF episode → train readout → held-out test.
-/// CI-friendly (no data files). Edit knobs in the sections below.
+/// @brief Synthetic multi-class fields → WTF episode → train readout → held-out.
+///
+/// CI / fast gate (no data files). Six classes of length-N cube fields:
+/// multi-tone carriers in the low half, sparse peaks in the high half, plus
+/// deterministic noise. Not a vision claim — a portable orbit → HCNN smoke.
+///
+/// Pipeline: MakePattern → CollectEpisodes → TrainOnCollected →
+/// held-out MakePattern (rep offset so fields are not the training draws) →
+/// PredictClass.
+///
+/// Default path: frozen reservoir orbit (bypass_reservoir = false).
+/// Knobs: MakeWTFConfig() = product WTFConfig; k* below = demo-only.
+/// Sibling: examples/mnist/wtf_mnist.cpp (IDX data; study A/Bs).
 
 #include "WTF.h"
 #include "done_beep.h"
@@ -10,35 +21,53 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <stdexcept>
 #include <vector>
 
 // =============================================================================
-// WTF configuration — primary knobs for this demo (edit here)
+// Demo task size (also sets readout.num_outputs)
 // =============================================================================
 
 static constexpr int kNumClasses = 6;
+
+// =============================================================================
+// WTF configuration — primary knobs for this demo (edit here)
+// =============================================================================
+//
+// Live MakeWTFConfig() snapshot (keep in sync with the body below):
+//   reservoir: dim=7 N=128  M=8  seed=1
+//              SR_target=0.999  leak=1  in_scale=0.03  bias_scale=0.003
+//   episode:   T=0(=N)  B=1  ic_seed=2  train_input_noise_sigma=0  bypass=false
+//   readout:   seed=3  dim=0(auto)  num_outputs=6  epochs=100  batch=32
+//              lr_max=0.0015  lr_min_frac=0.01  threads=1  restore_best=false
+// Demo: train=64/class held-out=32/class field_noise_amp=0.18 CI_floor=0.70
+// =============================================================================
 
 static WTFConfig MakeWTFConfig()
 {
     WTFConfig cfg;
 
-    // Reservoir (fixed dynamics)
-    cfg.reservoir.dim           = 7; // N = 128 — room for harder spatial structure
-    cfg.reservoir.history_depth = 8;
-    cfg.reservoir.seed          = 1;
-    cfg.reservoir.verbose       = false;
-    cfg.reservoir.input_scaling = 0.03f; // milder drive → less trivial separation
+    // Reservoir (fixed dynamics) — smaller cube than MNIST for a fast CI gate
+    cfg.reservoir.dim             = 7; // N = 128
+    cfg.reservoir.history_depth   = 8;
+    cfg.reservoir.seed            = 1;
+    cfg.reservoir.spectral_radius = 0.999f;
+    cfg.reservoir.leak_rate       = 1.0f;
+    cfg.reservoir.input_scaling   = 0.03f; // milder drive → less trivial separation
+    cfg.reservoir.bias_scaling    = 0.003f;
+    cfg.reservoir.verbose         = false;
 
     // Episode IC (separate from weight seed)
     cfg.ic_seed = 2;
 
-    // Episode: T = 0 means default T = N; B = end-of-episode slices
-    cfg.episode.T              = 0;
-    cfg.episode.readout_slices = 1;
+    // Episode: T = 0 means default T = N after construction
+    cfg.episode.T                       = 0;
+    cfg.episode.readout_slices          = 1;
+    cfg.episode.train_input_noise_sigma = 0.0f;
+    cfg.episode.bypass_reservoir        = false;
 
     // Readout (trainable HCNN)
+    cfg.readout.seed               = 3;
     cfg.readout.dim                = 0; // auto = dim + log2(B)
     cfg.readout.num_outputs        = kNumClasses;
     cfg.readout.task               = ReadoutTask::Classification;
@@ -49,9 +78,8 @@ static WTFConfig MakeWTFConfig()
     cfg.readout.lr_min_frac        = 0.01f;
     cfg.readout.lr_decay_epochs    = 0;
     cfg.readout.weight_decay       = 0.0f;
-    cfg.readout.seed               = 3;
-    cfg.readout.num_threads        = 1;
-    cfg.readout.restore_best_epoch = false;
+    cfg.readout.num_threads        = 1; // pin for CI-ish determinism
+    cfg.readout.restore_best_epoch = false; // full buffer; no best-epoch holdout
 
     return cfg;
 }
@@ -61,9 +89,12 @@ static WTFConfig MakeWTFConfig()
 // =============================================================================
 
 static constexpr int kTrainPerClass = 64;
-static constexpr int kTestPerClass  = 32;
-static constexpr double kMinTestAcc = 0.70; // harder task; still a CI gate
-static constexpr float kNoiseStd    = 0.18f;
+static constexpr int kTestPerClass  = 32;  // held-out draws per class
+static constexpr double kMinTestAcc = 0.70; // CI gate (task is easy under this recipe)
+static constexpr float kNoiseStd    = 0.18f; // deterministic amp inside MakePattern
+
+// Held-out reps start here so they never reuse training (label, rep) pairs.
+static constexpr int kHeldOutRepBase = 10'000;
 
 // =============================================================================
 // Helpers
@@ -91,14 +122,19 @@ static float DetNoise(int label, int rep, size_t i, float amp)
     return amp * u;
 }
 
-/// Harder multi-class fields: shared pad/low layout, class-specific multi-tone
-/// carriers + sparse peaks + noise. Classes are not trivial ramps.
-static std::vector<float> MakePattern(size_t n, int label, int rep)
+/// Fill a length-N field for (label, rep). Classes share pad/low layout but use
+/// class-specific multi-tone carriers + sparse peaks + noise (not trivial ramps).
+static void FillPattern(std::span<float> x, int label, int rep)
 {
     if (label < 0 || label >= kNumClasses)
-        throw std::invalid_argument("MakePattern: label out of range");
+        throw std::invalid_argument("FillPattern: label out of range");
+    if (x.empty())
+        throw std::invalid_argument("FillPattern: empty field");
 
-    std::vector<float> x(n, -1.0f);
+    const size_t n = x.size();
+    for (size_t i = 0; i < n; ++i)
+        x[i] = -1.0f;
+
     const size_t half = n / 2;
     constexpr float kPi = 3.14159265358979323846f;
 
@@ -136,8 +172,6 @@ static std::vector<float> MakePattern(size_t n, int label, int rep)
         if (x[idx] < -1.0f)
             x[idx] = -1.0f;
     }
-
-    return x;
 }
 
 // =============================================================================
@@ -153,8 +187,10 @@ int main()
 
         WTF wtf(cfg);
         wtf_ex::PrintWtfHeader("wtf_synth", wtf, cfg);
-        std::printf("wtf_synth: classes=%d train=%d/class noise=%.2f\n",
-                    kNumClasses, kTrainPerClass, kNoiseStd);
+        std::printf(
+            "wtf_synth: classes=%d train=%d/class held-out=%d/class field_noise=%.2f\n",
+            kNumClasses, kTrainPerClass, kTestPerClass, static_cast<double>(kNoiseStd));
+        std::fflush(stdout);
 
         auto t0 = std::chrono::steady_clock::now();
         const size_t n_train =
@@ -165,44 +201,57 @@ int main()
             const int c = static_cast<int>(i / static_cast<size_t>(kTrainPerClass));
             train_labels[i] = c;
         }
+
+        std::printf("Collecting %zu episodes (parallel)...\n", n_train);
+        std::fflush(stdout);
         wtf.CollectEpisodes(
             n_train, train_labels,
             [&](size_t i, std::span<float> out_field) {
                 const int c = static_cast<int>(i / static_cast<size_t>(kTrainPerClass));
                 const int r = static_cast<int>(i % static_cast<size_t>(kTrainPerClass));
-                auto x = MakePattern(wtf.N(), c, r);
-                std::memcpy(out_field.data(), x.data(), x.size() * sizeof(float));
+                FillPattern(out_field, c, r);
             });
+        std::printf("Training readout on %zu episodes...\n", wtf.NumCollected());
+        std::fflush(stdout);
         wtf.TrainOnCollected();
-        // Full collected buffer (no holdout in this demo) — not a separate test set.
+        // Full collected buffer (restore_best_epoch is off in this demo).
         const double acc_on_collected = wtf.AccuracyOnCollected();
         auto t1 = std::chrono::steady_clock::now();
 
         size_t correct = 0;
         size_t total = 0;
+        std::vector<float> field(wtf.N());
         for (int c = 0; c < kNumClasses; ++c)
         {
             for (int r = 0; r < kTestPerClass; ++r)
             {
-                // Fresh noise/phase stream (rep offset) for held-out fields.
-                auto x = MakePattern(wtf.N(), c, r + 10'000);
-                if (wtf.PredictClass(x) == c)
+                FillPattern(field, c, r + kHeldOutRepBase);
+                if (wtf.PredictClass(field) == c)
                     ++correct;
                 ++total;
             }
         }
+        auto t2 = std::chrono::steady_clock::now();
+
         const double test_acc =
             static_cast<double>(correct) / static_cast<double>(total);
-        const double secs = std::chrono::duration<double>(t1 - t0).count();
+        const double secs_collect_train =
+            std::chrono::duration<double>(t1 - t0).count();
+        const double secs_held_out =
+            std::chrono::duration<double>(t2 - t1).count();
+        const double secs_total =
+            std::chrono::duration<double>(t2 - t0).count();
 
-        std::printf("wtf_synth: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu) "
-                    "collect+train=%.2fs\n",
-                    acc_on_collected, test_acc, correct, total, secs);
+        std::printf("wtf_synth: acc_on_collected=%.3f held-out_acc=%.3f (%zu/%zu)\n"
+                    "wtf_synth: time %.2f+%.2f=%.2fs (collect+train|held-out|total)\n",
+                    acc_on_collected, test_acc, correct, total,
+                    secs_collect_train, secs_held_out, secs_total);
         std::fflush(stdout);
 
         if (test_acc < kMinTestAcc)
         {
-            std::fprintf(stderr, "wtf_synth: test accuracy too low (need >= %.2f)\n",
+            std::fprintf(stderr,
+                         "wtf_synth: held-out accuracy too low (need >= %.2f)\n",
                          kMinTestAcc);
         }
         else

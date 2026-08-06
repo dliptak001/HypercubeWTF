@@ -228,9 +228,10 @@ reservoir.
 ## Appendix B — Tabulated logs
 
 Column conventions: **Training data** = clean vs corrupted training set;
-**Path** = Bypass or Reservoir; **collected** = accuracy on the clean training
-feature buffer; **held-out acc** = accuracy on the held-out set. Drops are in
-percentage points (pp).
+**Path** = Bypass or Reservoir; **collected** = accuracy on the training feature
+buffer used for that arm (clean or corrupted collect, matching the training data
+row); **held-out acc** = accuracy on the held-out set. Drops are in percentage
+points (pp).
 
 ### Held-out AWGN σ = 0.5 (noise seed `0x7E57`)
 

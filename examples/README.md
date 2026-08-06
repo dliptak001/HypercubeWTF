@@ -41,6 +41,14 @@ MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remain
 Edit knobs at the top of each demo: `MakeWTFConfig()` (product) and `k*`
 demo/task constants — same pattern as HypercubeESN examples.
 
+### Synthetic gate (`wtf_synth`)
+
+Fast portable smoke: **no files**. Builds 6 classes of length-N fields
+(multi-tone + sparse peaks + deterministic noise), runs a frozen orbit, trains
+the HCNN readout, scores a held-out rep stream. Default dim=7 (*N*=128),
+T=N, 64 train / 32 held-out per class. Soft CI floor **0.70** (typical held-out
+is much higher under the shipped knobs). Edit `examples/synth/wtf_synth.cpp`.
+
 ### MNIST data
 
 `wtf_mnist` loads **only** from `C:\HypercubeWTF\data` (local deploy root).
