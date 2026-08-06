@@ -30,7 +30,7 @@ samples, optional noise switches, pass/fail floor for continuous integration).
 A self-contained smoke test. It **builds fake multi-class patterns in memory**
 (no download), trains the head, and scores new patterns it has not trained on.
 
-You should see a held-out accuracy well above the soft floor of **0.70** (often
+You should see a test accuracy well above the soft floor of **0.70** (often
 near ceiling under the shipped settings). If it fails that floor, something is
 wrong with the build or runtime.
 

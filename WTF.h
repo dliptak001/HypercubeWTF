@@ -165,10 +165,10 @@ public:
     [[nodiscard]] int PredictClass(std::span<const float> x);
 
     /// Accuracy of the trained readout on the collected (training) set —
-    /// not a held-out metric (classification).
+    /// not a test-set metric (classification).
     [[nodiscard]] double AccuracyOnCollected() const;
 
-    /// R² on the collected (training) set — not held-out (regression).
+    /// R² on the collected (training) set — not a test-set metric (regression).
     [[nodiscard]] double R2OnCollected() const;
 
 private:

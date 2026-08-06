@@ -62,27 +62,27 @@ Reservoir — end state of a short frozen reservoir episode
 
 **Bypass** asks: is the hypercube pack + HypercubeCNN enough? **Reservoir** asks:
 does a short frozen episode on the same cube change how hard a **degraded
-training data set** hits held-out accuracy?
+training data set** hits test accuracy?
 
 This evaluation asks only:
 
-**When the training data set is degraded, how much does held-out accuracy fall
+**When the training data set is degraded, how much does test accuracy fall
 on each path — and is the reservoir less sensitive than bypass?**
 
-Sensitivity is measured under two **held-out** regimes (clean fields vs strong
+Sensitivity is measured under two **test** regimes (clean fields vs strong
 **additive white Gaussian noise (AWGN)** on the packed field) so the
 training-data effect is not confounded with a single evaluation condition.
 
 **MNIST is only the evaluation vehicle** — a lightweight, familiar, convenient
-data set with a standard training/held-out split, not a product claim about
+data set with a standard training/test split, not a product claim about
 digits or vision. The pipeline under study is pack → optional hypercube
 reservoir → HypercubeCNN on a length-N field; any static field that packs onto
 the cube is in scope for the same idea.
 
-**Held-out accuracy here is not a ceiling on the substrate.** These studies use a
+**Test accuracy here is not a ceiling on the substrate.** These studies use a
 **dim = 10** hypercube (*N* = 1024) so campaigns stay fast to iterate. That is a
 deliberate study choice, not a statement of product accuracy. **HypercubeCNN has
-already demonstrated ~99.5% on MNIST**; the HypercubeWTF MNIST example does not
+already demonstrated ≈99.5% on MNIST**; the HypercubeWTF MNIST example does not
 try to re-prove that number. The interesting deltas are **relative** (how each
 path moves when the training data set is degraded), not absolute MNIST
 leaderboard scores.
@@ -91,18 +91,18 @@ leaderboard scores.
 
 ## The claim
 
-**Hypothesis (confirmed on this survey):** under **strong AWGN on the held-out
+**Hypothesis (confirmed on this survey):** under **strong AWGN on the test
 packed field**, the reservoir path is **less sensitive** to training-data
-quality than bypass; under a **clean held-out set**, both paths are **about
+quality than bypass; under a **clean test set**, both paths are **about
 equally sensitive** (small, similar drops). Differences below are in
 **percentage points (pp)**.
 
-| Held-out condition | Reservoir vs degraded training set | Bypass vs degraded training set |
-|--------------------|------------------------------------|---------------------------------|
-| Strong AWGN (σ = 0.5) | Smaller drop (~8 pp) | Larger drop (~19 pp) |
-| Clean (no field noise) | Small drop (~1 pp) | Small drop (~1 pp) |
+| Test condition | Reservoir vs degraded training set | Bypass vs degraded training set |
+|----------------|------------------------------------|---------------------------------|
+| Strong AWGN (σ = 0.5) | Smaller drop (≈8 pp) | Larger drop (≈19 pp) |
+| Clean (no field noise) | Small drop (≈1 pp) | Small drop (≈1 pp) |
 
-“Sensitivity” here means how much **held-out accuracy falls** when the
+“Sensitivity” here means how much **test accuracy falls** when the
 **training data set** is degraded, holding the evaluation protocol fixed.
 
 ---
@@ -118,7 +118,7 @@ training path**, even though it remains available in the C++ / Python SDKs.
 Serendipitously, for **this** study that same buggy / failing training
 augmentation module can be used deliberately as a **training-set corruptor**:
 systematic geometric and mild pixel noise on the image **before** pack, applied
-only when building the training data set. **Held-out images** are never run
+only when building the training data set. **Test images** are never run
 through that spatial-aug corruptor.
 
 ```text
@@ -126,18 +126,18 @@ Clean training set     — augmentation off; pack raw digits → features → tr
 Corrupted training set — augmentation on; pack corrupted digits → features → train HCNN
 ```
 
-Crossing clean vs corrupted training sets with clean vs AWGN held-out fields is the rest of the design.
+Crossing clean vs corrupted training sets with clean vs AWGN test fields is the rest of the design.
 
 ---
 
-## Strong held-out AWGN — reservoir is more tolerant of a degraded training set
+## Strong test AWGN — reservoir is more tolerant of a degraded training set
 
-When the **held-out packed fields** carry heavy white noise (σ = 0.5), both arms
+When the **test packed fields** carry heavy white noise (σ = 0.5), both arms
 lose accuracy if the **training data set** was corrupted. They do not lose it
 equally.
 
-| Training data | Bypass held-out acc | Reservoir held-out acc | Reservoir − bypass |
-|---------------|---------------------|------------------------|--------------------|
+| Training data | Bypass test acc | Reservoir test acc | Reservoir − bypass |
+|---------------|-----------------|--------------------|--------------------|
 | Clean | 0.830 | **0.927** | +9.7 pp |
 | Corrupted (aug) | 0.645 | **0.843** | +19.8 pp |
 
@@ -146,29 +146,29 @@ A corrupted training set costs bypass about **19 pp** and the reservoir about
 
 ---
 
-## Clean held-out set — similar sensitivity
+## Clean test set — similar sensitivity
 
-When the **held-out data set** is noise-free, corrupting the **training data
+When the **test set** is noise-free, corrupting the **training data
 set** costs both arms only about a point, and final accuracies stay close.
 
-| Training data | Bypass held-out acc | Reservoir held-out acc |
-|---------------|---------------------|------------------------|
+| Training data | Bypass test acc | Reservoir test acc |
+|---------------|-----------------|--------------------|
 | Clean | 0.978 | 0.979 |
 | Corrupted (aug) | 0.971 | 0.969 |
 
-About **1 pp** lost on each path — equally sensitive under a clean held-out set.
+About **1 pp** lost on each path — equally sensitive under a clean test set.
 
 ---
 
 ## Picture in one view
 
-Rows = held-out condition; columns = training-data quality. Each cell:
-**held-out accuracy** then **takeaway**.
+Rows = test condition; columns = training-data quality. Each cell:
+**test accuracy** then **takeaway**.
 
 | | **Clean training set** | **Corrupted training set** |
 |:---|:---|:---|
-| **Clean held-out** | ~0.98 / ~0.98 — **parity** | ~0.97 / ~0.97 — **parity** (small tax) |
-| **Held-out AWGN (σ = 0.5)** | ~0.93 / ~0.83 — **reservoir ahead** | ~0.84 / ~0.65 — **reservoir much more tolerant** |
+| **Clean test** | ≈0.98 / ≈0.98 — **parity** | ≈0.97 / ≈0.97 — **parity** (small tax) |
+| **Test AWGN (σ = 0.5)** | ≈0.93 / ≈0.83 — **reservoir ahead** | ≈0.84 / ≈0.65 — **reservoir much more tolerant** |
 
 Within each cell, order is **reservoir / bypass**.
 
@@ -181,9 +181,9 @@ Within each cell, order is **reservoir / bypass**.
   set; dim-10 results do not endorse using the SDK spatial-aug facility that way).
 - Multi-seed coverage of every cell (this was a quick, one noise seed study).
 
-What it **does** support: under strong AWGN on the held-out packed field,
+What it **does** support: under strong AWGN on the test packed field,
 degrading the **training data set** hurts **bypass more** than **reservoir**;
-under a clean held-out set, both take a small, similar hit.
+under a clean test set, both take a small, similar hit.
 
 ---
 
@@ -211,16 +211,16 @@ and **ignores** reservoir dynamics.
 | Readout training epochs | `readout.epochs` | **100** (reservoir on); **20** (bypass arms) |
 | Readout weight count (result of that layout) | — | 82122 |
 | MNIST packing mode | demo pack mode | PadLowCenter |
-| Training / held-out set sizes | demo limits | 60000 / 10000 |
+| Training / test set sizes | demo limits | 60000 / 10000 |
 
 **Corrupted training set** (demo spatial aug, training only): rotation ±12°,
 scale [0.9, 1.1], shift ±2 px, shear_x ±0.15, shear_y 0, elastic off, additive
 image noise σ = 0.03 — applied on 28×28 **before** pack.
 
-**Held-out AWGN** (evaluation only): Gaussian σ = 0.5 on the packed field; noise
+**Test AWGN** (evaluation only): Gaussian σ = 0.5 on the packed field; noise
 seed base `0x7E57`.
 
-Factor under study: training-data quality × held-out noise × bypass vs
+Factor under study: training-data quality × test noise × bypass vs
 reservoir.
 
 ---
@@ -230,30 +230,30 @@ reservoir.
 Column conventions: **Training data** = clean vs corrupted training set;
 **Path** = Bypass or Reservoir; **collected** = accuracy on the training feature
 buffer used for that arm (clean or corrupted collect, matching the training data
-row); **held-out acc** = accuracy on the held-out set. Drops are in percentage
+row); **test acc** = accuracy on the MNIST test set. Drops are in percentage
 points (pp).
 
-### Held-out AWGN σ = 0.5 (noise seed `0x7E57`)
+### Test AWGN σ = 0.5 (noise seed `0x7E57`)
 
-| Training data | Path | collected | held-out acc |
-|---------------|------|-----------|--------------|
+| Training data | Path | collected | test acc |
+|---------------|------|-----------|----------|
 | Corrupted | Reservoir | 0.970 | 0.843 |
 | Corrupted | Bypass | 0.995 | 0.645 |
 | Clean | Reservoir | 0.992 | 0.927 |
 | Clean | Bypass | 0.998 | 0.830 |
 
-### Clean held-out set (no field noise)
+### Clean test set (no field noise)
 
-| Training data | Path | collected | held-out acc |
-|---------------|------|-----------|--------------|
+| Training data | Path | collected | test acc |
+|---------------|------|-----------|----------|
 | Corrupted | Reservoir | 0.970 | 0.969 |
 | Corrupted | Bypass | 0.995 | 0.971 |
 | Clean | Reservoir | 0.992 | 0.979 |
 | Clean | Bypass | 0.999 | 0.978 |
 
-### Sensitivity summary (held-out acc drop when the training data set is corrupted)
+### Sensitivity summary (test acc drop when the training data set is corrupted)
 
-| Held-out condition | Reservoir drop | Bypass drop |
-|--------------------|----------------|-------------|
+| Test condition | Reservoir drop | Bypass drop |
+|----------------|----------------|-------------|
 | σ = 0.5 | −8.4 pp | −18.5 pp |
 | clean | −1.0 pp | −0.7 pp |

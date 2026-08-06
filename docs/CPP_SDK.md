@@ -275,7 +275,7 @@ These are product contracts, not implementation trivia.
 - **Only the end state** goes to the readout (optional multi-age pack `B`).
 - **Train noise is collect-only.** `Predict` / `RunEpisode` stay clean.
 - **`Predict` returns raw logits** (or regression values) — no softmax.
-- **`AccuracyOnCollected` / `R2OnCollected` are training-set scores**, not held-out.
+- **`AccuracyOnCollected` / `R2OnCollected` are training-set scores**, not test-set metrics.
 - **One `WTF` per thread of control.** Bulk collect parallelizes *inside* one call;
   do not call public methods concurrently on the same object.
 - **`WTF` is not copyable.** Prefer exclusive ownership of one instance.
@@ -374,7 +374,7 @@ int main() {
     }
     wtf.TrainOnCollected();
 
-    // AccuracyOnCollected is the *training* set, not held-out data.
+    // AccuracyOnCollected is the *training* set, not test data.
     std::printf("train acc=%.3f  pred0=%d pred1=%d\n",
                 wtf.AccuracyOnCollected(),
                 wtf.PredictClass(field(0)),
@@ -428,11 +428,11 @@ demos tune these widely, so treat “typical” as a starting band, not a recipe
 |-------|---------|---------------|----------------|
 | `dim` | Cube dimension; N = 2<sup>dim</sup> | 5…16 | 7…10 |
 | `seed` | Weight draws | any `uint64_t` | fixed per experiment |
-| `spectral_radius` | Target for recurrent rescale | > 0 | ~0.4…0.999 |
+| `spectral_radius` | Target for recurrent rescale | > 0 | ≈0.4…0.999 |
 | `leak_rate` | Mix each step | (0, 1] | 0.5…1 |
-| `input_scaling` | How hard the field drives | ≥ 0 | ~0.005…0.03 |
+| `input_scaling` | How hard the field drives | ≥ 0 | ≈0.005…0.03 |
 | `history_depth` | M (delay-line depth) | 1…64 | 4…16 |
-| `bias_scaling` | Bias strength; 0 = off | ≥ 0 | 0…~0.003 |
+| `bias_scaling` | Bias strength; 0 = off | ≥ 0 | 0…≈0.003 |
 | `verbose` | Construction printout | bool | false |
 
 **Readout** (trainable head) — knobs most hosts touch:

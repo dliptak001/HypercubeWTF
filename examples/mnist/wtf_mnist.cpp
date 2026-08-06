@@ -2,8 +2,8 @@
 /// @brief MNIST → pack length-N field → WTF episode → train end-state readout.
 ///
 /// Pipeline: IDX load → (train-only optional 28×28 aug) → pack → CollectEpisodes
-/// → TrainOnCollected → held-out pack (+ optional field AWGN) → PredictClass.
-/// Train set = MNIST train IDX (kMaxTrain); held-out = t10k (kMaxTest).
+/// → TrainOnCollected → test pack (+ optional field AWGN) → PredictClass.
+/// Train set = MNIST train IDX (kMaxTrain); test = t10k (kMaxTest).
 ///
 /// Packing is example-owned (vendored HCNN SpatialEmbed):
 ///   PadLow       — full 28×28 in [0,784), pad [784,N) (needs N >= 784).
@@ -13,12 +13,12 @@
 /// Main A/B levers (prefer one experimental factor at a time):
 ///   episode.bypass_reservoir — false = frozen orbit (default story);
 ///                              true  = pack field → readout (needs B=1).
-///   kTestNoiseSigma          — held-out i.i.d. Gaussian on packed length-N
+///   kTestNoiseSigma          — test i.i.d. Gaussian on packed length-N
 ///                              field after pack (eval protocol only).
 ///   kTrainAug                — train-only geometric/pixel corruptor on 28×28
 ///                              before pack (not a recommended product path).
 ///   episode.train_input_noise_sigma — collect/train field noise inside WTF
-///                              (not kTestNoiseSigma; not held-out).
+///                              (not kTestNoiseSigma; not test-field noise).
 /// Prefer a single noise source when comparing (leave the others at 0).
 ///
 /// Runtime logs print pack=, aug=, and test_noise= lines for scan-friendly diffs.
@@ -134,14 +134,14 @@ static WTFConfig MakeWTFConfig()
 
 static constexpr PackMode kPack       = PackMode::PadLowCenter;
 static constexpr size_t kMaxTrain     = 60000; // 0 = all in file; smaller for quick smokes
-static constexpr size_t kMaxTest      = 10000; // held-out (t10k); 0 = all in file
+static constexpr size_t kMaxTest      = 10000; // test set (t10k); 0 = all in file
 static constexpr float kPad           = -1.0f;
 static constexpr int kImgSide         = 28;
 static constexpr int kImgPixels       = kImgSide * kImgSide;
 static constexpr double kMinTestAcc   = 0.50; // soft CI / smoke floor (not the recipe bar)
 
 // Train-only 2D aug (HCNNSpatialAug) on 28×28, then PackMode.
-// Held-out is never geometrically augmented.
+// Test set is never geometrically augmented.
 // Report line format (when on):
 //   aug=rot+/-12+scale[0.9,1.1]+shift+/-2+shear_x+/-0.15+shear_y+/-0+elastic(a=0,s=5)+N(0,0.03)
 static constexpr bool  kTrainAug         = false;
@@ -156,11 +156,11 @@ static constexpr float kAugElasticSigma  = 5.0f; // ignored when alpha == 0
 static constexpr float kAugNoiseSigma    = 0.03f;
 static constexpr unsigned kAugSeedBase   = 0xC0FFEEu;
 
-// Held-out protocol: N(0,σ) on the packed length-N field after PackSample,
+// Test protocol: N(0,σ) on the packed length-N field after PackSample,
 // before PredictClass. Not clamped (field may leave [-1,1]). 0 = off (default).
 // Independent of kTrainAug and of episode.train_input_noise_sigma.
 // Deterministic per sample from kTestNoiseSeedBase + index.
-// High-noise orbit vs bypass: try σ in ~0.3–0.5 (see WhiteNoiseFilter.md).
+// High-noise orbit vs bypass: try σ in 0.3–0.5 (see WhiteNoiseFilter.md).
 static constexpr float    kTestNoiseSigma    = 0.0f;
 static constexpr unsigned kTestNoiseSeedBase = 0x7E57u;
 
@@ -222,7 +222,7 @@ static void PrintTestNoiseReport()
                     static_cast<double>(kTestNoiseSigma), kTestNoiseSeedBase);
 }
 
-/// Held-out path: raw 28×28 → pack (no geometric aug). Optional field AWGN is
+/// Test path: raw 28×28 → pack (no geometric aug). Optional field AWGN is
 /// applied in the eval loop after this returns.
 static void PackSample(const wtf_ex::MnistSample& s,
                        std::span<float> field,
@@ -360,8 +360,8 @@ int main(int argc, char** argv)
             size_t correct = 0;
             for (size_t i = 0; i < test.size(); ++i)
             {
-                PackSample(test.samples[i], field, emb); // held-out: no geo aug
-                AddTestFieldNoise(field, i);             // optional held-out field AWGN
+                PackSample(test.samples[i], field, emb); // test: no geo aug
+                AddTestFieldNoise(field, i);             // optional test-field AWGN
                 if (wtf.PredictClass(field) == test.samples[i].label)
                     ++correct;
             }

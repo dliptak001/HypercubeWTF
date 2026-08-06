@@ -1,12 +1,12 @@
 /// @file wtf_synth.cpp
-/// @brief Synthetic multi-class fields → WTF episode → train readout → held-out.
+/// @brief Synthetic multi-class fields → WTF episode → train readout → test.
 ///
 /// CI / fast gate (no data files). Six classes of length-N cube fields:
 /// multi-tone carriers in the low half, sparse peaks in the high half, plus
 /// deterministic noise. Not a vision claim — a portable orbit → HCNN smoke.
 ///
 /// Pipeline: MakePattern → CollectEpisodes → TrainOnCollected →
-/// held-out MakePattern (rep offset so fields are not the training draws) →
+/// test MakePattern (rep offset so fields are not the training draws) →
 /// PredictClass.
 ///
 /// Default path: frozen reservoir orbit (bypass_reservoir = false).
@@ -39,7 +39,7 @@ static constexpr int kNumClasses = 6;
 //   episode:   T=0(=N)  B=1  ic_seed=2  train_input_noise_sigma=0  bypass=false
 //   readout:   seed=3  dim=0(auto)  num_outputs=6  epochs=100  batch=32
 //              lr_max=0.0015  lr_min_frac=0.01  threads=1  restore_best=false
-// Demo: train=64/class held-out=32/class field_noise_amp=0.18 CI_floor=0.70
+// Demo: train=64/class test=32/class field_noise_amp=0.18 CI_floor=0.70
 // =============================================================================
 
 static WTFConfig MakeWTFConfig()
@@ -88,12 +88,12 @@ static WTFConfig MakeWTFConfig()
 // =============================================================================
 
 static constexpr int kTrainPerClass = 64;
-static constexpr int kTestPerClass  = 32;  // held-out draws per class
+static constexpr int kTestPerClass  = 32;  // test draws per class
 static constexpr double kMinTestAcc = 0.70; // CI gate (task is easy under this recipe)
 static constexpr float kNoiseStd    = 0.18f; // deterministic amp inside MakePattern
 
-// Held-out reps start here so they never reuse training (label, rep) pairs.
-static constexpr int kHeldOutRepBase = 10'000;
+// Test reps start here so they never reuse training (label, rep) pairs.
+static constexpr int kTestRepBase = 10'000;
 
 // =============================================================================
 // Helpers
@@ -187,7 +187,7 @@ int main()
         WTF wtf(cfg);
         wtf_ex::PrintWtfHeader("wtf_synth", wtf, cfg);
         std::printf(
-            "wtf_synth: classes=%d train=%d/class held-out=%d/class field_noise=%.2f\n",
+            "wtf_synth: classes=%d train=%d/class test=%d/class field_noise=%.2f\n",
             kNumClasses, kTrainPerClass, kTestPerClass, static_cast<double>(kNoiseStd));
         std::fflush(stdout);
 
@@ -224,7 +224,7 @@ int main()
         {
             for (int r = 0; r < kTestPerClass; ++r)
             {
-                FillPattern(field, c, r + kHeldOutRepBase);
+                FillPattern(field, c, r + kTestRepBase);
                 if (wtf.PredictClass(field) == c)
                     ++correct;
                 ++total;
@@ -236,21 +236,21 @@ int main()
             static_cast<double>(correct) / static_cast<double>(total);
         const double secs_collect_train =
             std::chrono::duration<double>(t1 - t0).count();
-        const double secs_held_out =
+        const double secs_test =
             std::chrono::duration<double>(t2 - t1).count();
         const double secs_total =
             std::chrono::duration<double>(t2 - t0).count();
 
-        std::printf("wtf_synth: acc_on_collected=%.3f held-out_acc=%.3f (%zu/%zu)\n"
-                    "wtf_synth: time %.2f+%.2f=%.2fs (collect+train|held-out|total)\n",
+        std::printf("wtf_synth: acc_on_collected=%.3f test_acc=%.3f (%zu/%zu)\n"
+                    "wtf_synth: time %.2f+%.2f=%.2fs (collect+train|test|total)\n",
                     acc_on_collected, test_acc, correct, total,
-                    secs_collect_train, secs_held_out, secs_total);
+                    secs_collect_train, secs_test, secs_total);
         std::fflush(stdout);
 
         if (test_acc < kMinTestAcc)
         {
             std::fprintf(stderr,
-                         "wtf_synth: held-out accuracy too low (need >= %.2f)\n",
+                         "wtf_synth: test accuracy too low (need >= %.2f)\n",
                          kMinTestAcc);
         }
         else

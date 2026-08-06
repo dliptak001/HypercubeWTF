@@ -119,7 +119,7 @@ struct ReadoutConfig
     /// over the score set every epoch.
     bool restore_best_epoch = true;
     /// When @c restore_best_epoch is true: fraction of samples (in input order,
-    /// taken from the tail) held out for best-metric selection only — training
+    /// taken from the tail) set aside for best-metric selection only — training
     /// uses the prefix. 0 = score the full training set. Clamped to [0, 0.5].
     /// Requires at least 2 samples when > 0.
     float best_epoch_holdout_frac = 0.0f;

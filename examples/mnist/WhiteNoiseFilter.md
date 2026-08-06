@@ -75,10 +75,10 @@ pipeline under test is pack → optional hypercube reservoir → HypercubeCNN on
 length-N field; any static field that packs onto the cube is in scope for the
 same idea.
 
-**Held-out accuracy here is not a ceiling on the substrate.** These studies use a
+**Test accuracy here is not a ceiling on the substrate.** These studies use a
 **dim = 10** hypercube (*N* = 1024) so campaigns stay fast to iterate. That is a
 deliberate study choice, not a statement of product accuracy. **HypercubeCNN has
-already demonstrated ~99.5% on MNIST**; the HypercubeWTF MNIST example does not
+already demonstrated ≈99.5% on MNIST**; the HypercubeWTF MNIST example does not
 try to re-prove that number. The interesting deltas are **relative** (reservoir
 vs bypass under noise), not absolute MNIST leaderboard scores.
 
@@ -91,8 +91,8 @@ and substantially outperforms pack-only under strong white test noise.**
 
 | Condition | Bypass (pack → readout) | Reservoir (pack → episode → readout) |
 |-----------|-------------------------|--------------------------------------|
-| Clean or mild AWGN | Strong (~0.98) | Matchable (~0.98 when tuned; see below) |
-| Strong AWGN (σ = 0.5) | Collapses (~0.85) | Holds (~0.93) |
+| Clean or mild AWGN | Strong (≈0.98) | Matchable (≈0.98 when tuned; see below) |
+| Strong AWGN (σ = 0.5) | Collapses (≈0.85) | Holds (≈0.93) |
 
 The gap at σ = 0.5 is about **eight to nine percentage points (pp)**, stable
 across noise seeds. That is the product-relevant result.
@@ -107,10 +107,9 @@ noise seed are shared. The reservoir arm uses one fixed recipe (appendix).
 Bypass ignores reservoir dynamics; the hypercube still appears in **packing**
 the field onto the cube.
 
-**Held-out noise** is i.i.d. Gaussian on every packed vertex after pack and
-before prediction — flat spectrum, Gaussian amplitudes, additive (evaluation
-protocol only). It is not training-set field noise and not geometric
-augmentation.
+**Test noise** is i.i.d. Gaussian on every packed vertex after pack and before
+prediction — flat spectrum, Gaussian amplitudes, additive (evaluation protocol
+only). It is not training-set field noise and not geometric augmentation.
 
 **Train** stays clean. The head learns on clean features and is scored on clean
 or corrupted test fields — a domain-shift stress test, not matched noisy training.
@@ -140,22 +139,20 @@ readout.
 
 ## Clean and mild noise — nearly transparent
 
-A filter that only works by destroying the signal is useless. On **clean** test
-data, bypass is already excellent (~**0.979**). With the reservoir on, the same
-level is reachable (~**0.979** in the primary clean pair). Other recipes can sit
-a point or so under bypass; that is a **tuning** gap, not a hard ceiling. With
-further mild-recipe tuning there is every reason to expect clean (and low-noise)
-reservoir accuracy to **match** bypass when that is the goal — the pre-filter
-need not tax the clean path.
+On **clean** test data the two paths can match. Bypass is already excellent
+(**0.979**). The primary clean pair with the reservoir on hits the same number
+(**0.979**). Some other reservoir recipes land a point or so lower — that is a
+**tuning** gap, not a fixed cost of running the orbit. When parity on clean data
+is the goal, the logged match shows the pre-filter does not have to tax the clean
+path.
 
-At **mild** noise (σ = 0.1), one logged pair has bypass slightly ahead (**0.980**
-vs **0.968**). There is little white noise to remove; the preprocessor is optional,
-and the same tuning story applies.
+At **mild** noise (σ = 0.1) there is little white noise to remove. One logged
+pair has bypass slightly ahead (**0.980** vs **0.968**); the preprocessor is
+optional here, and the same tuning story applies.
 
 Operating picture:
 
-- **Clean / light noise** — aim for parity with bypass via recipe choice; logged
-  runs already show a match is achievable.
+- **Clean / light noise** — parity with bypass is achievable (and already logged).
 - **Heavy white noise** — the reservoir is the difference between mid-80s and
   low-90s.
 
@@ -172,7 +169,7 @@ under AWGN — not a universal denoise theorem.
 
 ## How to read the numbers
 
-**Test accuracy** is the decision metric (held-out MNIST).  
+**Test accuracy** is the decision metric (MNIST test set).  
 **Accuracy on collected** is fit to the clean training features. Under strong
 test noise, a huge collected–test gap on bypass means the head memorized clean
 packs and met a different distribution at test. The reservoir shrinks that gap
@@ -228,24 +225,24 @@ and readout and **ignores** reservoir dynamics.
 | Readout training epochs | `readout.epochs` | **100** (reservoir on); **20** (bypass arms) |
 | Readout weight count (result of that layout) | — | 82122 |
 | MNIST packing mode | demo pack mode | PadLowCenter |
-| Training / held-out set sizes | demo limits | 60000 / 10000 |
+| Training / test set sizes | demo limits | 60000 / 10000 |
 | Training spatial augmentation | demo | off |
 
-Some σ = 0.5 multi-seed rows used minor readout variants; reservoir held-out
-accuracy remained ~0.93. Factor under study: **bypass vs reservoir**.
+Some σ = 0.5 multi-seed rows used minor readout variants; reservoir test
+accuracy remained ≈0.93. Factor under study: **bypass vs reservoir**.
 
 ---
 
 ## Appendix B — Tabulated logs
 
 Column conventions: **Path** = Bypass or Reservoir; **collected** = accuracy on
-the clean training feature buffer; **held-out acc** = accuracy on the held-out
+the clean training feature buffer; **test acc** = accuracy on the MNIST test
 set. Δ is reservoir − bypass in percentage points (pp).
 
-### Held-out AWGN σ = 0.5 (three noise seeds)
+### Test AWGN σ = 0.5 (three noise seeds)
 
-| Noise seed | Path | collected | held-out acc | Δ (vs bypass) |
-|------------|------|-----------|--------------|---------------|
+| Noise seed | Path | collected | test acc | Δ (vs bypass) |
+|------------|------|-----------|----------|---------------|
 | `0x7E57` | Bypass | — | 0.847 | |
 | `0x7E57` | Reservoir | ≈0.978 | 0.929 | +8.2 pp |
 | `0x3E57` | Bypass | — | 0.846 | |
@@ -256,37 +253,37 @@ set. Δ is reservoir − bypass in percentage points (pp).
 Collected was logged once as ≈0.978 for the reservoir rows above (same recipe
 family).
 
-### Held-out AWGN σ = 0.5 (additional reservoir-only seeds)
+### Test AWGN σ = 0.5 (additional reservoir-only seeds)
 
 Minor readout variants of the same recipe family; bypass not re-run in this
 block.
 
-| Noise seed | Path | collected | held-out acc |
-|------------|------|-----------|--------------|
+| Noise seed | Path | collected | test acc |
+|------------|------|-----------|----------|
 | `0x1E57` | Reservoir | 0.992 | 0.930 |
 | `0x7E57` | Reservoir | 0.992 | 0.927 |
 
-### Held-out AWGN σ = 0.1 (noise seed `0x1E57`)
+### Test AWGN σ = 0.1 (noise seed `0x1E57`)
 
-| Path | collected | held-out acc |
-|------|-----------|--------------|
+| Path | collected | test acc |
+|------|-----------|----------|
 | Reservoir | 0.978 | 0.968 |
 | Bypass | 0.999 | 0.980 |
 
-### Clean held-out set (no field noise)
+### Clean test set (no field noise)
 
-| Path | collected | held-out acc |
-|------|-----------|--------------|
+| Path | collected | test acc |
+|------|-----------|----------|
 | Bypass | 0.999 | 0.979 |
 | Reservoir | 0.992 | 0.979 |
 
 (Other reservoir clean logs: 0.970–0.977 depending on minor readout settings;
 all near bypass.)
 
-### Cross-σ snapshot (held-out accuracy)
+### Cross-σ snapshot (test accuracy)
 
-| Held-out noise | Bypass | Reservoir |
-|----------------|--------|-----------|
-| off | ~0.979 | ~0.979 |
+| Test noise | Bypass | Reservoir |
+|------------|--------|-----------|
+| off | ≈0.979 | ≈0.979 |
 | σ = 0.1 | **0.980** | 0.968 |
-| σ = 0.5 (multi-seed) | ~0.84–0.85 | **~0.93** |
+| σ = 0.5 (multi-seed) | ≈0.84–0.85 | **≈0.93** |
