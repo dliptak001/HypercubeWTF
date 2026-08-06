@@ -25,8 +25,8 @@
 /// Narratives: examples/mnist/WhiteNoiseFilter.md,
 ///             examples/mnist/TrainingDataQualitySensitivity.md.
 ///
-/// Data: C:\HypercubeWTF\data only (not the CLion clone's data/).
-/// Knobs: MakeWTFConfig() = product WTFConfig; k* below = demo-only.
+/// Data: C:\HypercubeWTF\data only (see examples/README.md appendix).
+/// Knobs: MakeWTFConfig() = product WTFConfig; demo constants below.
 
 #include "WTF.h"
 #include "done_beep.h"
@@ -401,7 +401,7 @@ int main(int argc, char** argv)
                      "Place uncompressed MNIST IDX files in C:\\HypercubeWTF\\data\\:\n"
                      "  train-images-idx3-ubyte  train-labels-idx1-ubyte\n"
                      "  t10k-images-idx3-ubyte   t10k-labels-idx1-ubyte\n"
-                     "See data/README.md\n");
+                     "See examples/README.md (Appendix: MNIST files)\n");
     }
     wtf_ex::DoneBeep();
     return exit_code;

@@ -35,7 +35,7 @@ inline std::filesystem::path FindMnistDataDir(const char* /*argv0*/)
         "Need:\n"
         "  train-images-idx3-ubyte  train-labels-idx1-ubyte\n"
         "  t10k-images-idx3-ubyte   t10k-labels-idx1-ubyte\n"
-        "See data/README.md");
+        "See examples/README.md (Appendix: MNIST files)");
 }
 
 } // namespace wtf_ex

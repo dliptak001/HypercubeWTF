@@ -1,69 +1,129 @@
 # HypercubeWTF examples
 
-Phase 4 demos. Packing is **example-owned** (not core API).
+This folder holds **two runnable demos** of HypercubeWTF.
 
-## Layout
+**What the product does (in plain terms):** take a fixed-size array of numbers
+(a “field”), run it through a **frozen** recurrent network on a hypercube
+(the *reservoir*), then train a small **HypercubeCNN** head to classify the
+result. The reservoir weights never learn; only the head does.
+
+These demos own everything outside that core: inventing synthetic inputs,
+loading MNIST, laying images onto the field, and optional noise experiments.
+The library itself is collect → train → predict.
+
+Build the project in **Release** (CLion or `cmake --build cmake-build-release`),
+then run the binary you care about.
+
+| Program | What it is for | Do you need data files? |
+|---------|----------------|-------------------------|
+| `wtf_synth` | Quick check that the stack works | No |
+| `wtf_mnist` | Real images (handwritten digits) and the written studies | Yes — see below |
+
+Settings live at the **top of each program’s `.cpp` file**: product options in
+`MakeWTFConfig()`, and a few demo-only constants just under that (how many
+samples, optional noise switches, pass/fail floor for continuous integration).
+
+---
+
+## `wtf_synth` — run this first
+
+A self-contained smoke test. It **builds fake multi-class patterns in memory**
+(no download), trains the head, and scores new patterns it has not trained on.
+
+You should see a held-out accuracy well above the soft floor of **0.70** (often
+near ceiling under the shipped settings). If it fails that floor, something is
+wrong with the build or runtime.
+
+Source: [`synth/wtf_synth.cpp`](synth/wtf_synth.cpp).
+
+---
+
+## `wtf_mnist` — handwritten digits
+
+Same train-and-score loop as synth, but the inputs are **MNIST digit images**.
+Each 28×28 image is laid onto the hypercube field, the reservoir (or a
+pack-only shortcut) produces features, and the head predicts digit 0–9.
+
+### Data setup
+
+`wtf_mnist` does **not** read MNIST from this git clone. It loads **only** from
+the local deploy folder:
+
+```text
+C:\HypercubeWTF\data\
+```
+
+Create that folder if needed, download the standard MNIST IDX files into it
+(see [Appendix: MNIST files](#appendix-mnist-files)), and leave the four
+uncompressed `*-ubyte` files there. The dataset is **not** part of this
+repository.
+
+### About the accuracy numbers
+
+The MNIST demo and study write-ups use a **small** hypercube (dimension 10 →
+1024 vertices) so experiments stay quick. Do **not** treat those scores as the
+best this family of models can do. HypercubeCNN alone has already shown about
+**99.5%** on MNIST; this example is not trying to match that leaderboard.
+
+Source: [`mnist/wtf_mnist.cpp`](mnist/wtf_mnist.cpp).
+
+### Optional studies (longer reads)
+
+Two markdown write-ups use `wtf_mnist` as a vehicle. They answer product
+questions; they are not required to run the demo.
+
+| Document | In plain English |
+|----------|------------------|
+| [`mnist/WhiteNoiseFilter.md`](mnist/WhiteNoiseFilter.md) | If we add strong white noise to the **test** field after packing, does running the reservoir help more than feeding the noisy pack straight to the CNN head? |
+| [`mnist/TrainingDataQualitySensitivity.md`](mnist/TrainingDataQualitySensitivity.md) | If the **training** images are deliberately degraded, how much does each path lose on clean or noisy tests? |
+
+Both compare two feature paths that share the same packing and head:
+
+- **Bypass** — skip the reservoir; the packed field goes to the head.
+- **Reservoir** — run the short frozen episode; the end state goes to the head.
+
+---
+
+## Folder layout
 
 ```text
 examples/
-  README.md
-  common/           # shared helpers (e.g. pack_field.h)
-  synth/            # wtf_synth — synthetic multi-class fields
-  mnist/            # wtf_mnist — MNIST PadLowCenter / PadLow
+  README.md                 # you are here
+  common/                   # shared helpers for the demos
+  synth/wtf_synth.cpp       # synthetic smoke demo
+  mnist/                    # MNIST demo + study docs
 ```
 
-Add a new demo as `examples/<name>/` and wire a target in the root `CMakeLists.txt`.
+To add another demo: create `examples/<name>/`, add a target in the root
+`CMakeLists.txt`, and reuse `common/` if it helps.
 
-## Packing rules (v1)
+---
 
-| Packer | Use | Layout |
-|--------|-----|--------|
-| **PadLow** | Synth patterns; optional MNIST | HCNN `PadLow`: data in verts `[0, P)`, pad `[P, N)` |
-| **PadLowCenter** | MNIST default (dim=10) | HCNN `PadLowCenter`: full 28×28 + centered crop in the tail |
+## Appendix: MNIST files
 
-MNIST demo maps `PackMode` → vendored `HCNNSpatialEmbedMode`. DualPlane remains on the embed enum for other hosts but is not a MNIST demo option.
+**Location (required by the demo):** `C:\HypercubeWTF\data\`
 
-**Train-only spatial aug** (vendored `HCNNSpatialAugmenter`): optional 2D geometry + noise on 28×28 **before** pack. Collect-once freezes one aug draw per sample.
-
-**Test field noise** (`kTestNoiseSigma` in `wtf_mnist`): optional i.i.d. Gaussian on the **packed** length-N field after pack, before `PredictClass`. Eval protocol only (default off). Not `episode.train_input_noise_sigma` (train/collect-only).
-
-**White-noise pre-filter (for HypercubeCNN):** see [`mnist/WhiteNoiseFilter.md`](mnist/WhiteNoiseFilter.md) — same frozen-reservoir discipline as HypercubeESN, pre-filtering static cube fields for the HCNN head; at σ=0.5 reservoir ~0.93 vs bypass ~0.85; clean accuracy comparable.
-
-**Training-data quality sensitivity:** see [`mnist/TrainingDataQualitySensitivity.md`](mnist/TrainingDataQualitySensitivity.md) — under strong test AWGN, reservoir loses less than bypass when train is corrupted; on clean test both paths take a similar small hit.
-
-## Binaries
-
-| Target | Folder | Data |
-|--------|--------|------|
-| `wtf_synth` | `examples/synth/` | None (CI-friendly) |
-| `wtf_mnist` | `examples/mnist/` | **`C:\HypercubeWTF\data` only** |
-
-Edit knobs at the top of each demo: `MakeWTFConfig()` (product) and `k*`
-demo/task constants — same pattern as HypercubeESN examples.
-
-### Synthetic gate (`wtf_synth`)
-
-Fast portable smoke: **no files**. Builds 6 classes of length-N fields
-(multi-tone + sparse peaks + deterministic noise), runs a frozen orbit, trains
-the HCNN readout, scores a held-out rep stream. Default dim=7 (*N*=128),
-T=N, 64 train / 32 held-out per class. Soft CI floor **0.70** (typical held-out
-is much higher under the shipped knobs). Edit `examples/synth/wtf_synth.cpp`.
-
-### MNIST data
-
-`wtf_mnist` loads **only** from `C:\HypercubeWTF\data` (local deploy root).
-It does not use a CLion/source-tree `data/`, cwd walks, or other projects.
+**Required files** (uncompressed IDX, exact names):
 
 ```text
-C:\HypercubeWTF\data\train-images-idx3-ubyte
-C:\HypercubeWTF\data\train-labels-idx1-ubyte
-C:\HypercubeWTF\data\t10k-images-idx3-ubyte
-C:\HypercubeWTF\data\t10k-labels-idx1-ubyte
+train-images-idx3-ubyte
+train-labels-idx1-ubyte
+t10k-images-idx3-ubyte
+t10k-labels-idx1-ubyte
 ```
 
-See [`data/README.md`](../data/README.md).
+These are the usual public MNIST binaries (LeCun et al.). We do **not** ship
+them in git — fetch once onto your machine.
 
-### Product note
+**Download example** (run from `C:\HypercubeWTF\data`, or save into that folder):
 
-These demos show **static field → reservoir orbit → end-state HCNN readout**.  
-They are not a bake-off against HypercubeCNN `mnist_train` accuracy.
+```text
+curl -L -O https://storage.googleapis.com/cvdf-datasets/mnist/train-images-idx3-ubyte.gz
+curl -L -O https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz
+curl -L -O https://storage.googleapis.com/cvdf-datasets/mnist/t10k-images-idx3-ubyte.gz
+curl -L -O https://storage.googleapis.com/cvdf-datasets/mnist/t10k-labels-idx1-ubyte.gz
+gunzip *.gz
+```
+
+On Windows, any tool that downloads those four `.gz` files and decompresses them
+into `C:\HypercubeWTF\data` is fine.
