@@ -167,6 +167,7 @@ public:
     /**
      * Embed `batch` images. Each sample is height*width; each output plane is N.
      * out layout: sample-major, stride = N.
+     * batch == 0 is a no-op (null in/out allowed).
      */
     void embed_batch(const float* in, int batch, int height, int width,
                      float* out) const;

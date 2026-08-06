@@ -271,6 +271,9 @@ HCNNSpatialEmbedPlan HCNNSpatialEmbedder::plan(int height, int width) const {
         p.pattern_length = static_cast<int>(two_planes);
         break;
     }
+    default:
+        throw std::runtime_error(
+            "HCNNSpatialEmbedder::plan: unknown HCNNSpatialEmbedMode");
     }
     return p;
 }
@@ -296,14 +299,17 @@ void HCNNSpatialEmbedder::embed(const float* in, int height, int width,
         break;
     }
     case HCNNSpatialEmbedMode::PadLowCenter: {
-        const int n_pix = height * width;
-        std::memcpy(out, in, static_cast<std::size_t>(n_pix) * sizeof(float));
+        const std::size_t n_pix =
+            static_cast<std::size_t>(height) * static_cast<std::size_t>(width);
+        std::memcpy(out, in, n_pix * sizeof(float));
         if (p.crop_h > 0 && p.crop_w > 0) {
             float* tail = out + n_pix;
+            const std::size_t row_bytes =
+                static_cast<std::size_t>(p.crop_w) * sizeof(float);
             for (int y = 0; y < p.crop_h; ++y) {
                 const float* row = in + (p.crop_row0 + y) * width + p.crop_col0;
-                for (int x = 0; x < p.crop_w; ++x)
-                    tail[y * p.crop_w + x] = row[x];
+                std::memcpy(tail + static_cast<std::size_t>(y) * static_cast<std::size_t>(p.crop_w),
+                            row, row_bytes);
             }
         }
         break;
@@ -325,6 +331,9 @@ void HCNNSpatialEmbedder::embed(const float* in, int height, int width,
         grad_magnitude_plane(out, out + plane, S, pad);
         break;
     }
+    default:
+        throw std::runtime_error(
+            "HCNNSpatialEmbedder::embed: unknown HCNNSpatialEmbedMode");
     }
 }
 
@@ -335,6 +344,8 @@ void HCNNSpatialEmbedder::embed_batch(const float* in, int batch,
         throw std::runtime_error(
             "HCNNSpatialEmbedder::embed_batch: batch must be >= 0");
     }
+    if (batch == 0)
+        return;  // no-op; null buffers allowed
     if (!in || !out) {
         throw std::runtime_error("HCNNSpatialEmbedder::embed_batch: null buffer");
     }
