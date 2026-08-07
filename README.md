@@ -4,41 +4,17 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)]()
 [![CMake](https://img.shields.io/badge/CMake-3.21+-blue.svg)]()
 
-> **VERY EARLY DEVELOPMENT (0.1.x).** APIs, defaults, demos, and numbers can
-> change without notice. Not a release product yet — use for exploration and
-> co-development only.
-
 **HypercubeWTF** drives a **static** length-N field through a **frozen**
 hypercube reservoir for a short synthetic orbit, then trains a small
-[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head on the **end
-state only**. The reservoir weights never learn; only the readout does.
+[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head on the
+**end state only**. The reservoir weights never learn; only the readout does.
 
 The product surface is small and contract-driven: hosts integrate **`WTF`**
-(`#include "WTF.h"`, link **`HypercubeWTFCore`**). Packing domain data onto the
-cube is **your** job — spectra, sensor frames, packed images, lab fingerprints,
-or any length-N floats you build yourself.
+(`#include "WTF.h"`, link **`HypercubeWTFCore`**). Packing domain data onto
+the cube is **your** job — spectra, sensor frames, packed images, lab
+fingerprints, or any length-N floats you build yourself.
 
 Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
-
-### What does WTF stand for?
-
-Not a solemn three-word paper title — though that route was tried.
-
-The brief was simple: take the HypercubeESN idea — frozen reservoir, trained
-head — and aim it at **data that has no time**. Spectra. Frames. Fingerprints.
-Stills. There was no lineage to steal a name from, so the usual naming exercise
-followed. Nothing stuck. There was even a brief attempt at a “real”
-acronym built from a mouthful like *temporal-translation Gaussian additive-white-
-noise CNN pre-filter on a hypercube substrate* — the kind of expansion that
-looks at home in a methods section and dies the moment you have to say it out
-loud. After a few hours of “maybe this?” and “nah.”, the working monologue devolved
-to **what the f\*\*\* do we call this new toy?**
-
-So we called it that.
-
-**HypercubeWTF**
-
-The monologue won — and the brand gained a little personality :-)
 
 ---
 
@@ -57,32 +33,67 @@ The monologue won — and the brand gained a little personality :-)
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
-HypercubeWTF is yet another experiment in the **HypercubeAI** project — our
-quest to map AI and ML strategies onto the hypercube as a shared computational
-substrate. Each product in the family is a different architecture on that same
-foundation:
+HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
+map AI and ML strategies onto the hypercube as a shared computational
+substrate.
+
+Why the hypercube rather than a random reservoir graph? A few properties keep
+showing up — and they explain why a frozen reservoir and a HypercubeCNN
+readout fit together so cleanly:
+
+- **A topology you don’t store** — the graph is specified: connectivity is
+  implicit in the vertex indices; with a seed and a few drive scalars the whole
+  reservoir reconstructs mathematically.
+- **Perfect homogeneity** — every vertex has the same degree and the same local
+  world, so local dynamics mean the same thing everywhere — no structural
+  favorites baked in by a random graph.
+- **Topology-native pairing** — the readout consumes the reservoir’s output with
+  zero geometric distortion, and the learned kernels exploit the same locality
+  that generated the dynamics. The data never leaves the hypercube it was born
+  on.
+
+Each product in the family is a different architecture on that same foundation:
 
 | Product | Natural data | Role of the hypercube |
 |---------|--------------|------------------------|
 | **[HypercubeESN](https://github.com/dliptak001/HypercubeESN)** | Low-dim **streams** over time | Frozen **reservoir** stepped each sample; multi-slice state → HypercubeCNN readout |
 | **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)** | Static patterns on the cube | Trainable **spatial** conv/pool on the cube (no recurrent reservoir) |
 | **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)** | Patterns / attractors | Associative memory dynamics on the cube |
-| **HypercubeWTF** | Static high-dim fields (**no** intrinsic time) | Same **frozen hypercube reservoir** discipline as ESN, driven for a short **episode** per sample, then HypercubeCNN on the **end state** |
+| **[HypercubeWTF](https://github.com/dliptak001/HypercubeWTF)** | Static high-dim fields (**no** intrinsic time) | Same **frozen hypercube reservoir** discipline as ESN, driven for a short **episode** per sample, then HypercubeCNN on the **end state** |
 
-Shared vertices, shared XOR neighborhoods — the cube is the substrate, not a
-bolt-on graph. This product is the **dynamical-encoder path for static fields**.
+---
+
+### What does WTF stand for?
+
+Not a solemn three-word paper title — though that route was tried.
+
+The brief was simple: take the HypercubeESN idea — frozen reservoir, trained
+head — and aim it at **data that has no time**. Spectra. Frames. Fingerprints.
+Stills. There was no lineage to steal a name from, so the usual naming exercise
+followed. Nothing stuck. There was even a brief attempt at a “real” acronym
+built from a mouthful like *temporal-translation Gaussian additive-white-noise
+CNN pre-filter on a hypercube substrate* — the kind of expansion that looks at
+home in a methods section and dies the moment you have to say it out loud.
+After a few hours of “maybe this?” and “nah.”, the working monologue devolved
+to **what the f\*\*\* do we call this new toy?**
+
+So we called it that.
+
+**HypercubeWTF**
+
+The monologue won — and the brand gained a little personality :-)
 
 ---
 
 ## What is HypercubeWTF?
 
-[HypercubeESN](https://github.com/dliptak001/HypercubeESN) processes **temporal
-streams**. [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) processes
-**spatial data sets** with a trainable conv stack on the cube. HypercubeWTF also
-takes spatial data sets, but before the convolution engine each field passes
-through a **dynamical encoder** (the reservoir). The head never sees the
-original field; it sees an encoded end-of-episode state generated by reservoir
-dynamics.
+[HypercubeESN](https://github.com/dliptak001/HypercubeESN) processes
+**temporal streams**. [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)
+processes **spatial data sets** with a trainable conv stack on the cube.
+HypercubeWTF also takes spatial data sets, but before the convolution engine
+each field passes through a **dynamical encoder** (the reservoir). The head
+never sees the original field; it sees an encoded end-of-episode state
+generated by reservoir dynamics.
 
 In classical reservoir computing (and in HypercubeESN):
 
@@ -92,8 +103,9 @@ In classical reservoir computing (and in HypercubeESN):
 
 WTF uses that same idea on a **still picture**. There is no natural next frame,
 so the library invents a short synthetic orbit: it re-addresses the same fixed
-field for `T` passes (XOR registration on the cube), then samples **once** at
-the end. Geometry and weights stay put; only the registration of the field moves.
+field for `T` passes (XOR registration on the cube), then samples **once**
+at the end. Geometry and weights stay put; only the registration of the
+field moves.
 
 | Piece | Trains? |
 |-------|---------|
@@ -102,38 +114,27 @@ the end. Geometry and weights stay put; only the registration of the field moves
 | Field packing | Caller-owned |
 | HCNN readout | **Yes** |
 
-**A good fit when:**
-
-- You have static length-N (or packable) fields and want an RC-style front-end
-- You already speak HypercubeESN / HypercubeCNN and want the same cube substrate
-- You are exploring dynamical encoding as an alternative to a static pack → CNN path
-
-**Not a stream product:** real-time temporal streams belong in HypercubeESN.
-**Not “just” a CNN:** pure static conv without a reservoir orbit is HypercubeCNN.
-
 Whether the dynamical encoding → CNN pipeline has **real product value** is
 still an open question. Early studies suggest interesting transformational
-behavior (see below). We are exploring it as a new technique — and if that kind
-of open question interests you, you are in the right place.
+behavior (see below).
 
 ---
 
 ## Pipeline
 
 ```text
-x  (length N, fixed for this episode; host-packed)
+x  (length-N field, host-packed, no natural time)
     │
     ▼
- Load frozen s0 → drive T passes (re-address field each pass) → pack B end ages
+ frozen hypercube reservoir runs a short episode
     │
     ▼
- features (B×N) → HypercubeCNN readout → class logits or regression values
+ end-of-episode features → HypercubeCNN → logits / values
 ```
 
-- **dim** chooses the cube; **N = 2<sup>dim</sup>** (dim 5…16).
-- Default **T = N** (full tour of address offsets); **B = 1** (newest delay-line
-  slice only).
-- Collect many episodes → `TrainOnCollected` → `Predict` / `PredictClass`.
+- Cube size from **dim** (N = 2<sup>dim</sup>; dim 5…16).
+- Only the readout trains.
+- Full knobs and contracts: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 
 ---
 
@@ -142,16 +143,18 @@ x  (length N, fixed for this episode; host-packed)
 The internal dynamics of this encoding appear to have some interesting
 properties we are just beginning to explore — for example filtering white noise
 when present, acting closer to an identity map when noise is absent, and
-reducing sensitivity to training-data quality when noise is present. These are
-**not** production claims; details and protocols live in the study notes:
+reducing sensitivity to training-data quality when noise is present. Treat that
+as early observation, not settled product behavior — the write-ups have the
+details and how we ran them:
 
 | Document | Question |
 |----------|----------|
 | [examples/mnist/WhiteNoiseFilter.md](examples/mnist/WhiteNoiseFilter.md) | Noisy test fields: does the reservoir orbit help vs pack-only → CNN? |
 | [examples/mnist/TrainingDataQualitySensitivity.md](examples/mnist/TrainingDataQualitySensitivity.md) | Degraded training data: how much does each path lose? |
 
-MNIST is a **vehicle** for those questions (small cubes, not a leaderboard). A
-more rigorous study is still needed before hardening any of the claims.
+The studies use MNIST on small cubes because it is handy to pack and run, not
+because we are chasing digit accuracy. A more rigorous study is still needed
+before hardening any of the claims.
 
 ---
 
@@ -207,16 +210,12 @@ WTF wtf(cfg);
 // collect episodes → TrainOnCollected → Predict / PredictClass
 ```
 
-When HypercubeWTF is a **subdirectory** of another project, demos are skipped;
-you still get **`HypercubeWTFCore`** (which pulls vendored **`HypercubeCNNCore`**).
-
 ---
 
 ## Examples (recipes)
 
-Demos are **not** the SDK definition. Product knobs live in each demo’s
-`MakeWTFConfig()`; demo-only constants sit beside them. Details:
-**[examples/README.md](examples/README.md)**.
+Product knobs live in each demo’s `MakeWTFConfig()`; demo-only constants sit
+beside them. Details: **[examples/README.md](examples/README.md)**.
 
 | Program | What it is for | Data files? |
 |---------|----------------|-------------|
@@ -258,8 +257,8 @@ CMake library target: **`HypercubeWTFCore`**. Optional top-level targets:
 |-----|------|
 | **[docs/CPP_SDK.md](docs/CPP_SDK.md)** | Product API — why explore, contracts, config, loop, pitfalls |
 | [examples/README.md](examples/README.md) | Demo map and MNIST data notes |
-| [examples/mnist/WhiteNoiseFilter.md](examples/mnist/WhiteNoiseFilter.md) | White-noise field study (MNIST vehicle) |
-| [examples/mnist/TrainingDataQualitySensitivity.md](examples/mnist/TrainingDataQualitySensitivity.md) | Training-set quality study (MNIST vehicle) |
+| [examples/mnist/WhiteNoiseFilter.md](examples/mnist/WhiteNoiseFilter.md) | White-noise field study (MNIST test bed) |
+| [examples/mnist/TrainingDataQualitySensitivity.md](examples/mnist/TrainingDataQualitySensitivity.md) | Training-set quality study (MNIST test bed) |
 | [third_party/HypercubeCNN/VENDORED.md](third_party/HypercubeCNN/VENDORED.md) | Which HypercubeCNN release is vendored |
 
 ---
@@ -267,12 +266,11 @@ CMake library target: **`HypercubeWTFCore`**. Optional top-level targets:
 ## Ecosystem
 
 - **[HypercubeESN](https://github.com/dliptak001/HypercubeESN)** — echo-state / reservoir computing on streams; same cube + HCNN readout family.
-- **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)** — cube-native conv stack; WTF’s trainable head (vendored pin in-tree).
+- **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)** — cube-native conv stack; WTF’s trainable head.
 - **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)** — Hopfield-style dynamics on the cube.
 
 ---
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE). Vendored HypercubeCNN is Apache-2.0 (see
-`third_party/HypercubeCNN/LICENSE`).
+Apache 2.0. See [LICENSE](LICENSE).
