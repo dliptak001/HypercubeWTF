@@ -133,7 +133,8 @@ x  (length-N field, host-packed, no natural time)
 
 - Cube size from **dim** (N = 2<sup>dim</sup>; dim 5…16).
 - Only the readout trains.
-- Full knobs and contracts: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
+- Full knobs and contracts: **[docs/CPP_SDK.md](docs/CPP_SDK.md)** ·
+  Python: **[docs/Python_SDK.md](docs/Python_SDK.md)**.
 
 ---
 
@@ -159,14 +160,51 @@ before treating any of those results as settled.
 
 ## Quick start
 
+### Python (recommended)
+
+```bash
+pip install hypercube-wtf
+```
+
+Pre-built wheels for Python **3.10–3.14** on common Windows, Linux, and macOS
+machines — no compiler required. Runtime dependency: NumPy only.
+
+```python
+import numpy as np
+import hypercube_wtf as hw
+
+dim = 7
+N = 1 << dim
+rng = np.random.default_rng(0)
+# Rows are length-N fields (N = 2^dim). Labels are class indices.
+fields = rng.standard_normal((48, N), dtype=np.float32)
+labels = rng.integers(0, 4, size=48, dtype=np.int32)
+
+wtf = hw.WTF(
+    dim=dim,
+    seed=1,
+    ic_seed=2,
+    readout_num_outputs=4,
+    readout_task="classification",
+)
+wtf.fit(fields, labels)
+print(wtf.predict_class(fields[0]), f"train acc={wtf.accuracy_on_collected():.3f}")
+```
+
+Full API: **[docs/Python_SDK.md](docs/Python_SDK.md)** · package README:
+[python/README.md](python/README.md) · runnable demos (git tree, not in the
+wheel): [python/examples/](python/examples/README.md).
+
+### C++
+
 **Needs:** C++23, CMake ≥ 3.21. Prefer **Release** when comparing numbers
 (Debug/Release float behavior can differ with this project’s fast-math flags).
 
-### CLion
+#### CLion
 
 Open the project, reload CMake, build **Release**.
 
-### Command line
+#### Command line
 
 With a C++23 toolchain on `PATH` (or CLion’s bundled MinGW/CMake):
 
@@ -185,7 +223,7 @@ your usual CMake generator — this repo is primarily developed under CLion.)
 | `wtf_synth` | Multi-class synthetic fields (no data files) |
 | `wtf_mnist` | MNIST pack → orbit → readout (needs IDX files) |
 
-### Use as a dependency
+#### Use as a dependency
 
 ```cmake
 add_subdirectory(path/to/HypercubeWTF)
@@ -208,6 +246,8 @@ cfg.readout.task = ReadoutTask::Classification;
 WTF wtf(cfg);
 // collect → TrainOnCollected → Predict / PredictClass
 ```
+
+Canonical C++ guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 
 ---
 
