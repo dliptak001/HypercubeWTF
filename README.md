@@ -31,7 +31,7 @@ followed. Nothing stuck. There was even a brief attempt at a “real”
 acronym built from a mouthful like *temporal-translation Gaussian additive-white-
 noise CNN pre-filter on a hypercube substrate* — the kind of expansion that
 looks at home in a methods section and dies the moment you have to say it out
-loud. Weeks of “maybe this?” and “nah.” At some point the working monologue was
+loud. Days of “maybe this?” and “nah.” At some point the working monologue was
 just **what the f\*\*\* do we call this new toy?**
 
 So we called it that.
