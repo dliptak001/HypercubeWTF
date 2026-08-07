@@ -130,11 +130,9 @@ x  (your length-N field — already on the cube, no natural time)
 
 - Cube size from **dim** (N = 2<sup>dim</sup>; dim 5…16).
 - Only the readout trains.
-- In this package the everyday loop is:
-
-  **`collect_episodes` → `train` → `predict` / `predict_class`**
-
-  or the one-shot **`fit`** (collect + train).
+- Everyday loop in this package:
+  `collect_episodes` → `train` → `predict` / `predict_class`,
+  or one-shot `fit` (collect + train).
 
 Unlike HypercubeESN’s Python API, there is no stream of small samples over real
 time and no next-step `fit` on a 1D signal. Each sample is one full field; the
@@ -162,9 +160,9 @@ details and how we ran them:
 The studies use MNIST on small cubes because it is handy to pack and run, not
 because we are chasing digit accuracy. A more rigorous study is still needed
 before treating any of those results as settled. You can reproduce the same
-ideas from Python with this package (pack fields yourself, then collect / train /
-predict). The original write-ups and C++ demos that produced the numbers live
-under
+ideas from Python with this package (pack fields yourself, then collect, train,
+and predict). The original write-ups and C++ demos that produced the numbers
+live under
 [`examples/mnist/`](https://github.com/dliptak001/HypercubeWTF/tree/main/examples/mnist).
 
 ---
@@ -218,10 +216,10 @@ you. This package does not pack 784 pixels or 300 bins for you.
 Shapes that matter:
 
 | Array | Shape | Notes |
-|-------|-------|--------|
+|-------|-------|-------|
 | `fields` | `(count, N)` | one length-N field per row |
-| classification `labels` | `(count,)` | integer class indices |
-| regression `targets` | `(count, num_outputs)` | float targets |
+| `labels` (classification) | `(count,)` | integer class indices |
+| `targets` (regression) | `(count, num_outputs)` | float targets |
 
 ```python
 import numpy as np
@@ -282,17 +280,17 @@ evaluation, hold some fields out and call `predict` / `predict_class` yourself.
 - **Episode loop** — `collect_episode` / `collect_episodes` → `train` →
   `predict` / `predict_class`
 - **`fit`** — clear, collect, and train when your arrays are ready
-- **dim 5–16** — field length N = 2<sup>dim</sup>; set orbit length with `T`,
-  end-of-orbit ages with `readout_slices` (B)
-- **Classification or regression** — `readout_task=...` fixed at construction
+- **dim 5–16** — field length N = 2<sup>dim</sup>; orbit length `T`;
+  end-of-orbit ages `readout_slices` (B)
+- **Classification or regression** — `readout_task` fixed at construction
 - **Bulk collect can parallelize** — `collect_threads` (0 = auto)
 - **Train-only field noise** — `train_input_noise_sigma` on collect, never on
   predict
 - **Skip-the-orbit path** — `bypass_reservoir=True` for pack-only comparisons
   (needs B = 1)
 - **Inspect an episode** — `run_episode(x)` then `last_features()`
-- **Save / load** — `save` / `load` (pickle: config + readout weights; collected
-  samples are not stored). Optional `save_readout_hcnn_model` /
+- **Save / load** — `save` / `load` (pickle: config + readout weights;
+  collected samples are not stored). Optional `save_readout_hcnn_model` /
   `load_readout_hcnn_model` for portable HCNW + arch JSON
 - **NumPy float32** — arrays converted for you; prefer contiguous float32
 
