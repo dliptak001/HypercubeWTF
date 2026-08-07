@@ -45,7 +45,7 @@ Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to map
 AI and ML strategies onto the hypercube as a computational substrate.
 
-Why the hypercube rather than a random reservoir graph? A few properties keep
+Why the hypercube? A few properties keep
 showing up — and they explain why a frozen reservoir and a HypercubeCNN readout
 fit together so cleanly:
 
