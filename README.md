@@ -196,15 +196,15 @@ target_include_directories(my_app PRIVATE path/to/HypercubeWTF)
 #include "WTF.h"
 
 WTFConfig cfg;
-cfg.reservoir.dim = 7;                 // N = 128
-cfg.reservoir.history_depth = 8;
+cfg.reservoir.dim = 7;
+cfg.reservoir.history_depth = 4;
 cfg.ic_seed = 2;
-cfg.episode.T = 0;                     // → T = N
+cfg.episode.T = 100;
 cfg.readout.num_outputs = 10;
 cfg.readout.task = ReadoutTask::Classification;
 
 WTF wtf(cfg);
-// collect episodes → TrainOnCollected → Predict / PredictClass
+// collect → TrainOnCollected → Predict / PredictClass
 ```
 
 ---
