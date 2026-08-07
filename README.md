@@ -4,15 +4,24 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)]()
 [![CMake](https://img.shields.io/badge/CMake-3.21+-blue.svg)]()
 
-**HypercubeWTF** drives a **static** length-N field through a **frozen**
-hypercube reservoir for a short synthetic orbit, then trains a small
-[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head on the
-**end state only**. The reservoir weights never learn; only the readout does.
+**HypercubeWTF** is for high-dimensional data that has no natural clock —
+spectra, sensor frames, packed images, stills. Those are the same kinds of
+static fields people usually feed a spatial CNN, an MLP, or a similar
+feed-forward stack. Classical reservoir computing wants a stream: a new
+low-dimensional sample each step, a state that evolves through real time. A
+still field offers no such sequence — the pattern is already complete — so
+HypercubeWTF repurposes the reservoir idea by inventing a short stretch of
+synthetic time. It places your length-N field on a **frozen** hypercube
+reservoir, drives an orbit (the same pattern re-addressed over the cube), and
+trains a small [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head
+on the **end state only**. The reservoir weights never learn; only the readout
+does. The head never sees the original pack — it sees what the dynamics left
+behind.
 
-The product surface is small and contract-driven: hosts integrate **`WTF`**
-(`#include "WTF.h"`, link **`HypercubeWTFCore`**). Packing domain data onto
-the cube is **your** job — spectra, sensor frames, packed images, lab
-fingerprints, or any length-N floats you build yourself.
+That is the product idea: **static field → short frozen episode → spatial
+readout on the final features**. Packing domain data onto the cube is
+**your** job — any length-N floats you build yourself. The library owns the
+orbit, the end-state features, and the trained head.
 
 Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 
