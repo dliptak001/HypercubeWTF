@@ -15,14 +15,12 @@ synthetic time. It places your length-N field on a **frozen** hypercube
 reservoir, drives a short orbit that encodes the field in the dynamics, and
 trains a small [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head
 on the **end state only**. The CNN head never sees the original field — it sees
-what the reservoir dynamics left behind. Those dynamics are not a neutral pipe:
+what the reservoir dynamics leave behind. Those dynamics are not a neutral pipe:
 early work suggests they can filter, reshape, and otherwise transform the field
 in ways a static pack-then-CNN path does not (see Early observations below).
 
-That is the product idea: **static field → short frozen episode → spatial
-readout on the final features**. Packing domain data onto the cube is
-**your** job — any length-N floats you build yourself. The library owns the
-orbit, the end-state features, and the trained head.
+That is the product idea: take a static field, encode it through a short stretch
+of reservoir dynamics, and train a spatial readout on what remains.
 
 Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
 
