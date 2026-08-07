@@ -53,10 +53,12 @@ addopts = "--import-mode=importlib"
 
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
-skip = ["*-win32", "*-manylinux_i686", "*-musllinux*", "pp*"]
+# win32 / i686 / musllinux only — do not list pp* unless PyPy is enabled (cibuildwheel v4 warns).
+skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
 test-requires = ["pytest>=7.0", "numpy>=1.21"]
-# {project} is this directory (python/) — where pyproject.toml lives.
-test-command = "pytest {project}/tests -v --tb=short --import-mode=importlib"
+# {project} is the repo checkout root (GHA / cibuildwheel host), not package-dir.
+# package-dir is python/; tests live at python/tests/.
+test-command = "pytest {project}/python/tests -v --tb=short --import-mode=importlib"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64", "aarch64"]
