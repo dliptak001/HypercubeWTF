@@ -6,8 +6,8 @@ HypercubeCNN readout on the **end state**, exposed as one `WTF` class.
 
 Deep dive on the C++ core: [CPP_SDK.md](CPP_SDK.md).
 
-Package version: **0.1.0** (`hypercube_wtf.__version__`). Early library —
-APIs and defaults can move.
+Package version: single source `python/hypercube_wtf/_version.py`
+(`hypercube_wtf.__version__` and the wheel metadata both read it).
 
 ## Contents
 
@@ -21,15 +21,23 @@ APIs and defaults can move.
 
 ## Installation
 
-### From PyPI (when published)
+### From PyPI (preferred)
+
+Pre-built **wheels** — no compiler required:
 
 ```bash
 pip install hypercube-wtf
 ```
 
-Import as `import hypercube_wtf as hw` (PyPI name `hypercube-wtf`).
+Import as `import hypercube_wtf as hw` (PyPI name `hypercube-wtf`). Wheels cover
+Python 3.10–3.14 on common Windows, Linux, and macOS architectures. NumPy is the
+only runtime dependency.
 
-### From source
+### From source (full repository)
+
+Compile only from a **full clone** of HypercubeWTF. The extension links the C++
+core and vendored HypercubeCNN that sit **outside** the `python/` package
+directory; a `python/`-only tree is not enough.
 
 Requirements: Python 3.10+, C++23 compiler, CMake 3.20+, scikit-build-core,
 pybind11, NumPy.
@@ -199,9 +207,10 @@ reject unknown future versions with an upgrade message.
 - `accuracy_on_collected` / `r2_on_collected` only look at samples you already
   trained on — a quick sanity check, not a test score. Hold fields out and call
   `predict` / `predict_class` for real evaluation.
-- Early 0.1.x product — match C++ contracts in [CPP_SDK.md](CPP_SDK.md).
+- Native contracts and config details: [CPP_SDK.md](CPP_SDK.md).
 
 ## Dependencies
 
-Runtime: NumPy. Build: scikit-build-core, pybind11, C++23, CMake. HypercubeCNN
-is vendored under `third_party/HypercubeCNN` and compiled into the extension.
+Runtime: NumPy. Build from a full repo clone: scikit-build-core, pybind11, C++23,
+CMake. HypercubeCNN is vendored under `third_party/HypercubeCNN` and compiled
+into the extension.

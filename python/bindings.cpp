@@ -39,7 +39,10 @@ void require_field_size(size_t got, size_t n, const char* what)
 PYBIND11_MODULE(_core, m)
 {
     m.doc() = "HypercubeWTF: frozen hypercube reservoir orbit + HypercubeCNN on end state";
-    m.attr("__version__") = "0.1.0";
+#ifndef HYPERCUBE_WTF_VERSION
+#  error "HYPERCUBE_WTF_VERSION must be set by CMake from hypercube_wtf/_version.py"
+#endif
+    m.attr("__version__") = HYPERCUBE_WTF_VERSION;
 
     py::class_<WTF>(m, "_WTF")
         // ── Construction ──

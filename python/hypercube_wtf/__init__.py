@@ -22,9 +22,9 @@ import pickle
 
 import numpy as np
 
-from ._core import _WTF, __version__ as _core_version
+from ._core import _WTF
+from ._version import __version__
 
-__version__ = _core_version
 __all__ = ["WTF", "__version__"]
 
 # Valid hypercube dimensions (matches C++ Reservoir::Create [5, 16] check).

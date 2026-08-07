@@ -43,11 +43,31 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/HypercubeCNN
                  ${CMAKE_BINARY_DIR}/HypercubeCNN-build)
 set(HCNN_LIBS HypercubeCNNCore)
 
+# ── Package version (single source: hypercube_wtf/_version.py) ──
+set(_HWTF_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/hypercube_wtf/_version.py")
+set(HYPERCUBE_WTF_VERSION "")
+file(STRINGS "${_HWTF_VERSION_FILE}" _HWTF_VERSION_LINES)
+foreach(_line IN LISTS _HWTF_VERSION_LINES)
+    # Strip CR (Windows) and match: __version__ = "x.y.z"
+    string(REPLACE "\r" "" _line "${_line}")
+    if(_line MATCHES "^__version__[ \t]*=[ \t]*\"([^\"]+)\"")
+        set(HYPERCUBE_WTF_VERSION "${CMAKE_MATCH_1}")
+        break()
+    endif()
+endforeach()
+if(HYPERCUBE_WTF_VERSION STREQUAL "")
+    message(FATAL_ERROR
+        "Could not parse __version__ from hypercube_wtf/_version.py")
+endif()
+message(STATUS "hypercube_wtf version: ${HYPERCUBE_WTF_VERSION}")
+
 # ── Build the Python extension module ──
 # HypercubeCNNCore's PUBLIC include dir propagates through the link below.
 pybind11_add_module(_core bindings.cpp ${CORE_SOURCES})
 target_include_directories(_core PRIVATE ${CORE_DIR})
 target_link_libraries(_core PRIVATE ${HCNN_LIBS})
+target_compile_definitions(_core PRIVATE
+    "HYPERCUBE_WTF_VERSION=\"${HYPERCUBE_WTF_VERSION}\"")
 
 # ── Linking ──
 if(MINGW)

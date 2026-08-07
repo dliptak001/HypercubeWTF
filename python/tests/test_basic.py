@@ -12,6 +12,7 @@ import pickle
 import numpy as np
 import pytest
 
+import hypercube_wtf
 from hypercube_wtf import WTF
 
 
@@ -60,6 +61,16 @@ def trained_cls(cls_data):
 
 
 # ── Construction ──
+
+class TestVersion:
+    def test_version_string(self):
+        v = hypercube_wtf.__version__
+        assert isinstance(v, str) and len(v) > 0
+        assert v[0].isdigit()
+        # Same string as the extension module (CMake baked from _version.py)
+        from hypercube_wtf import _core
+        assert _core.__version__ == v
+
 
 class TestConstruction:
     @pytest.mark.parametrize("dim", [5, 7])

@@ -4,14 +4,14 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "hypercube-wtf"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Python bindings for HypercubeWTF: frozen hypercube reservoir orbit + HypercubeCNN on end state"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.21"]
 license = "Apache-2.0"
 readme = "README.md"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -38,6 +38,12 @@ test = ["pytest>=7.0"]
 cmake.build-type = "Release"
 wheel.packages = ["hypercube_wtf"]
 
+# Version: edit only hypercube_wtf/_version.py
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "hypercube_wtf/_version.py"
+regex = '''(?x)__version__\s*=\s*["'](?P<value>[^"']+)["']'''
+
 [tool.pytest.ini_options]
 # importlib mode avoids source-dir shadowing the installed _core.pyd.
 # Set via addopts: there is no `import-mode` ini key — it is a CLI-only flag.
@@ -49,7 +55,8 @@ addopts = "--import-mode=importlib"
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*", "pp*"]
 test-requires = ["pytest>=7.0", "numpy>=1.21"]
-test-command = "pytest {project}/python/tests -v --tb=short --import-mode=importlib"
+# {project} is this directory (python/) — where pyproject.toml lives.
+test-command = "pytest {project}/tests -v --tb=short --import-mode=importlib"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64", "aarch64"]

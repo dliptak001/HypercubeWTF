@@ -169,6 +169,8 @@ live under
 
 ## Installation
 
+**Preferred:** install a pre-built wheel from PyPI (no compiler).
+
 ```bash
 pip install hypercube-wtf
 ```
@@ -179,15 +181,17 @@ print(hw.__version__)
 ```
 
 Package name on PyPI: **`hypercube-wtf`**. Import name: **`hypercube_wtf`**.
-Main type: **`hw.WTF`**. Early **0.1.x** — APIs can still move.
+Main type: **`hw.WTF`**.
 
-When wheels are published: Python 3.10–3.14 on common Windows, Linux, and macOS
-machines, no local compiler. Runtime dependency: NumPy only.
+Wheels target Python 3.10–3.14 on common Windows, Linux, and macOS machines.
+Runtime dependency: NumPy only.
 
-### From source
+### From source (full repository)
 
-Building the extension yourself needs Python 3.10+, a C++23 compiler, and
-CMake ≥ 3.20 (scikit-build + pybind11 pull the rest).
+To compile the extension yourself, clone this **entire** repository (not a
+minimal source-only download of the `python/` folder alone — the C++ core and
+vendored HypercubeCNN live next to `python/`). You need Python 3.10+, a C++23
+compiler, and CMake ≥ 3.20.
 
 ```bash
 git clone https://github.com/dliptak001/HypercubeWTF.git
