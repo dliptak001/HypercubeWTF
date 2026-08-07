@@ -64,9 +64,10 @@ pytest tests/ -v --import-mode=importlib
 
 ### Examples
 
-Short runnable hosts live under
-[`python/examples/`](../python/examples/README.md) in the git tree (not in the
-wheel):
+For a first try, the [Quick start](#quick-start) below is enough after
+`pip install`. Longer demos live on GitHub under
+[`python/examples/`](../python/examples/README.md) (not part of the pip install).
+From a clone of the repo:
 
 ```bash
 python python/examples/synthetic_classification.py
@@ -128,7 +129,7 @@ All knobs are fixed at construction (matches C++ `WTFConfig`).
 
 | Group | Keyword | Default | Notes |
 |-------|---------|---------|-------|
-| Reservoir | `dim` | required | 5–16; N = 2^dim |
+| Reservoir | `dim` | required | 5–16; N = 2<sup>dim</sup> |
 | | `seed` | C++ default | Weight init |
 | | `spectral_radius` | 0.999 | Target SR |
 | | `input_scaling` | 0.02 | Drive strength |
@@ -137,7 +138,7 @@ All knobs are fixed at construction (matches C++ `WTFConfig`).
 | | `bias_scaling` | 0.003 | 0 = off |
 | | `verbose` | False | Banner |
 | Episode | `ic_seed` | 1 | Frozen s0 |
-| | `T` | 0 | 0 → T = N |
+| | `T` | — | Drive passes; `0` expands to N at construct |
 | | `readout_slices` | 1 | B (power of two ≤ M) |
 | | `collect_threads` | 0 | 0 = auto |
 | | `train_input_noise_sigma` | 0 | Collect only |
@@ -195,9 +196,9 @@ reject unknown future versions with an upgrade message.
 
 - One `WTF` instance is not thread-safe for concurrent public calls (bulk collect
   parallelism is internal only).
-- `accuracy_on_collected` / `r2_on_collected` score the **training buffer**, not
-  a held-out test set. Evaluate test data with `predict` / `predict_class` in
-  the host.
+- `accuracy_on_collected` / `r2_on_collected` only look at samples you already
+  trained on — a quick sanity check, not a test score. Hold fields out and call
+  `predict` / `predict_class` for real evaluation.
 - Early 0.1.x product — match C++ contracts in [CPP_SDK.md](CPP_SDK.md).
 
 ## Dependencies

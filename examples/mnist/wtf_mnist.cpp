@@ -94,7 +94,6 @@ static WTFConfig MakeWTFConfig()
     // Episode IC (separate from weight seed)
     cfg.ic_seed = 12;
 
-    // Episode: T = 0 means default T = N
     cfg.episode.T              = 20;
     cfg.episode.readout_slices = 1;
     // Collect/train only. Keep 0 when kTrainAug pixel noise or kTestNoise A/B

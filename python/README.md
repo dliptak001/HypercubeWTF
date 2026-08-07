@@ -119,7 +119,7 @@ behavior (see [Early observations](#early-observations-exploratory)).
 ## Pipeline
 
 ```text
-x  (length-N field, host-packed, no natural time)
+x  (your length-N field — already on the cube, no natural time)
     │
     ▼
  frozen hypercube reservoir runs a short orbit
@@ -130,13 +130,18 @@ x  (length-N field, host-packed, no natural time)
 
 - Cube size from **dim** (N = 2<sup>dim</sup>; dim 5…16).
 - Only the readout trains.
-- Product loop: **collect episodes → train readout → predict**.
-- Full knobs and contracts: **[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)**
-  · **[docs/CPP_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/CPP_SDK.md)**.
+- In this package the everyday loop is:
 
-This is **not** HypercubeESN’s stream pipeline (no warmup / next-step fit on a
-1D signal). Time here is synthetic and per-sample: one full field in, one
-end-state feature pack out.
+  **`collect_episodes` → `train` → `predict` / `predict_class`**
+
+  or the one-shot **`fit`** (collect + train).
+
+Unlike HypercubeESN’s Python API, there is no stream of small samples over real
+time and no next-step `fit` on a 1D signal. Each sample is one full field; the
+“time” is the short synthetic orbit; the CNN only ever sees the state at the end.
+
+Full method list and knobs:
+**[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)**.
 
 ---
 
@@ -156,10 +161,11 @@ details and how we ran them:
 
 The studies use MNIST on small cubes because it is handy to pack and run, not
 because we are chasing digit accuracy. A more rigorous study is still needed
-before treating any of those results as settled. The campaigns themselves are
-C++ demos under
-[`examples/mnist/`](https://github.com/dliptak001/HypercubeWTF/tree/main/examples/mnist);
-the Python package exposes the same product API for your own hosts.
+before treating any of those results as settled. You can reproduce the same
+ideas from Python with this package (pack fields yourself, then collect / train /
+predict). The original write-ups and C++ demos that produced the numbers live
+under
+[`examples/mnist/`](https://github.com/dliptak001/HypercubeWTF/tree/main/examples/mnist).
 
 ---
 
@@ -169,14 +175,21 @@ the Python package exposes the same product API for your own hosts.
 pip install hypercube-wtf
 ```
 
-Import as `import hypercube_wtf as hw` (PyPI name `hypercube-wtf`). Pre-built
-wheels for Python **3.10–3.14** on Windows (x64), Linux (x86_64, aarch64), and
-macOS (x86_64, arm64) when published. No compiler required for wheels. NumPy is
-the only runtime dependency.
+```python
+import hypercube_wtf as hw
+print(hw.__version__)
+```
+
+Package name on PyPI: **`hypercube-wtf`**. Import name: **`hypercube_wtf`**.
+Main type: **`hw.WTF`**. Early **0.1.x** — APIs can still move.
+
+When wheels are published: Python 3.10–3.14 on common Windows, Linux, and macOS
+machines, no local compiler. Runtime dependency: NumPy only.
 
 ### From source
 
-Requires Python 3.10+, a C++23 compiler, and CMake ≥ 3.20.
+Building the extension yourself needs Python 3.10+, a C++23 compiler, and
+CMake ≥ 3.20 (scikit-build + pybind11 pull the rest).
 
 ```bash
 git clone https://github.com/dliptak001/HypercubeWTF.git
@@ -184,34 +197,36 @@ cd HypercubeWTF/python
 pip install .
 ```
 
-On Windows with CLion’s bundled MinGW, put that toolchain’s `bin` (and Ninja) on
-`PATH`, set `CMAKE_GENERATOR=Ninja`, and point `CC`/`CXX` at MinGW gcc/g++ —
-exact install paths change with the CLion version. Then:
+On Windows with CLion’s MinGW, put that compiler’s `bin` folder (and Ninja) on
+your `PATH`, then:
 
 ```bash
 pip install . --no-build-isolation --force-reinstall --no-deps
 ```
 
-### Tests
-
-```bash
-pip install ".[test]"
-pytest tests/ -v --import-mode=importlib
-```
+(Exact CLion paths change with the version.) Step-by-step toolchain notes:
+[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md).
 
 ---
 
 ## Quick start
 
-Host packing is your job: every sample is a length-**N** float32 field
-(`N = 2**dim`). The library does not invent a map from 784 pixels or 300 bins
-onto the cube.
+You bring each sample as a length-**N** float array (N = 2<sup>dim</sup>). How
+you get there — pad an image, reshape a spectrum, invent a layout — is up to
+you. This package does not pack 784 pixels or 300 bins for you.
+
+Shapes that matter:
+
+| Array | Shape | Notes |
+|-------|-------|--------|
+| `fields` | `(count, N)` | one length-N field per row |
+| classification `labels` | `(count,)` | integer class indices |
+| regression `targets` | `(count, num_outputs)` | float targets |
 
 ```python
 import numpy as np
 import hypercube_wtf as hw
 
-# Host packs domain data to length N = 2**dim
 dim = 7
 N = 2**dim
 rng = np.random.default_rng(0)
@@ -221,20 +236,23 @@ labels = rng.integers(0, 4, size=200)
 wtf = hw.WTF(
     dim=dim,
     history_depth=4,
-    T=100,  # drive passes; 0 means T = N after construction
+    T=100,
     ic_seed=2,
     readout_num_outputs=4,
     readout_task="classification",
     readout_epochs=80,
 )
-# collect episodes → train readout → predict
-wtf.fit(fields, labels)
+wtf.fit(fields, labels)  # collect_episodes + train
 
-print(f"train acc (collected set): {wtf.accuracy_on_collected():.3f}")
+print(wtf.N, wtf.T, wtf.num_collected)
+print(f"train sanity check: {wtf.accuracy_on_collected():.3f}")
 print(wtf.predict_class(fields[0]), wtf.predict(fields[0]).shape)
+
+wtf.save("model.pkl")
+loaded = hw.WTF.load("model.pkl")
 ```
 
-### Explicit lifecycle (same as C++ collect → train → predict)
+### Step by step (same loop, more control)
 
 ```python
 wtf = hw.WTF(
@@ -244,52 +262,62 @@ wtf = hw.WTF(
 )
 wtf.collect_episodes(fields_train, labels_train)
 wtf.train()
-logits = wtf.predict(fields_test[0])
-cls = wtf.predict_class(fields_test[0])
+logits = wtf.predict(fields_test[0])       # (num_outputs,) float32
+cls = wtf.predict_class(fields_test[0])    # int
 ```
 
-`accuracy_on_collected` / `r2_on_collected` score the **training buffer**, not a
-held-out test set. Evaluate test fields with `predict` / `predict_class` in the
-host.
+For regression, set `readout_task="regression"` and pass float targets instead
+of class labels. Then use `r2_on_collected()` the same way as the classification
+sanity check.
+
+`accuracy_on_collected` and `r2_on_collected` only look at the samples you
+already trained on — they are a quick sanity check, not a test score. For real
+evaluation, hold some fields out and call `predict` / `predict_class` yourself.
 
 ---
 
 ## Features
 
-- **Episode API** — `collect_episode` / `collect_episodes` → `train` →
-  `predict` / `predict_class` (mirrors C++ `WTF`)
-- **One-shot `fit`** — clear + collect + train for static field batches
-- **Hypercube dim 5–16** — N = 2<sup>dim</sup> field length; T drive passes
-  (default T = N); optional multi-slice end features (B)
-- **HCNN readout** — same family as ESN; classification or regression
-- **Collect parallelism** — bulk collect uses internal worker reservoirs
+- **One class** — `hypercube_wtf.WTF` is the whole product surface
+- **Episode loop** — `collect_episode` / `collect_episodes` → `train` →
+  `predict` / `predict_class`
+- **`fit`** — clear, collect, and train when your arrays are ready
+- **dim 5–16** — field length N = 2<sup>dim</sup>; set orbit length with `T`,
+  end-of-orbit ages with `readout_slices` (B)
+- **Classification or regression** — `readout_task=...` fixed at construction
+- **Bulk collect can parallelize** — `collect_threads` (0 = auto)
 - **Train-only field noise** — `train_input_noise_sigma` on collect, never on
   predict
-- **Bypass path** — optional pack-only features (no orbit) for ablations
-- **Persistence** — pickle (config + readout weights); optional HCNW readout
-  export for C++ interop
-- **NumPy float32** — contiguous arrays in and out
+- **Skip-the-orbit path** — `bypass_reservoir=True` for pack-only comparisons
+  (needs B = 1)
+- **Inspect an episode** — `run_episode(x)` then `last_features()`
+- **Save / load** — `save` / `load` (pickle: config + readout weights; collected
+  samples are not stored). Optional `save_readout_hcnn_model` /
+  `load_readout_hcnn_model` for portable HCNW + arch JSON
+- **NumPy float32** — arrays converted for you; prefer contiguous float32
 
 ---
 
 ## Examples
 
-Runnable hosts use only the public package — no CMake, no native example
-binaries. They live in the **git tree** under
+For a first try, paste the [Quick start](#quick-start) after
+`pip install hypercube-wtf`. That is self-contained.
+
+If you want a longer walk-through, the demo scripts on GitHub under
 [`python/examples/`](https://github.com/dliptak001/HypercubeWTF/tree/main/python/examples)
-and are **not** installed by the PyPI wheel.
+are there to open or download — they are not added to your machine by pip.
 
 | Script | What it is for |
 |--------|----------------|
-| [synthetic_classification.py](https://github.com/dliptak001/HypercubeWTF/blob/main/python/examples/synthetic_classification.py) | Multi-class length-N fields → fit → train / test accuracy |
+| [synthetic_classification.py](https://github.com/dliptak001/HypercubeWTF/blob/main/python/examples/synthetic_classification.py) | Multi-class toy fields: `fit`, then train and test accuracy |
 
 ```bash
-# clone HypercubeWTF, then from the repo root:
-pip install hypercube-wtf   # or: pip install ./python
+# from a clone of HypercubeWTF, after: pip install hypercube-wtf
 python python/examples/synthetic_classification.py
 ```
 
-Onboarding demos only — easy synthetic fields, not storefront metrics. Index:
+These use easy made-up fields so the API is obvious — not scores to publish.
+More notes:
 [python/examples/README.md](https://github.com/dliptak001/HypercubeWTF/blob/main/python/examples/README.md).
 
 ---
@@ -298,14 +326,12 @@ Onboarding demos only — easy synthetic fields, not storefront metrics. Index:
 
 | Doc | Role |
 |-----|------|
-| **[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)** | Python package — episode API, install, pickle, layout |
-| **[docs/CPP_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/CPP_SDK.md)** | C++ product API — why explore, contracts, config, loop, pitfalls |
-| [Project README](https://github.com/dliptak001/HypercubeWTF#readme) | Architecture framing (same story as this document’s intro) |
-| [examples/README.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/README.md) | Demo map and MNIST data notes |
-| [python/examples/README.md](https://github.com/dliptak001/HypercubeWTF/blob/main/python/examples/README.md) | Python host index |
-| [WhiteNoiseFilter.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/WhiteNoiseFilter.md) | White-noise field study (MNIST test bed) |
-| [TrainingDataQualitySensitivity.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/TrainingDataQualitySensitivity.md) | Training-set quality study (MNIST test bed) |
-| [VENDORED.md](https://github.com/dliptak001/HypercubeWTF/blob/main/third_party/HypercubeCNN/VENDORED.md) | Which HypercubeCNN release is vendored |
+| **[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)** | Canonical Python API — every method, layout, pickle, limits |
+| [python/examples/README.md](https://github.com/dliptak001/HypercubeWTF/blob/main/python/examples/README.md) | Demo scripts on GitHub |
+| [Project README](https://github.com/dliptak001/HypercubeWTF#readme) | Product story and C++ demos from the repo root |
+| [docs/CPP_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/CPP_SDK.md) | Native library guide (same product, C++) |
+| [WhiteNoiseFilter.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/WhiteNoiseFilter.md) | Early white-noise study (MNIST as a test bed) |
+| [TrainingDataQualitySensitivity.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/TrainingDataQualitySensitivity.md) | Early training-quality study (MNIST as a test bed) |
 
 ---
 

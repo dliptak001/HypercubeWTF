@@ -1,7 +1,6 @@
 # Python examples
 
-Runnable **Python hosts** for the `hypercube-wtf` API. They use only the public
-package surface — no CMake, no C++ example binaries.
+Demo scripts for the `hypercube-wtf` API. They call only the installed package.
 
 | Script | What it shows |
 |--------|----------------|
@@ -9,14 +8,14 @@ package surface — no CMake, no C++ example binaries.
 
 ## How to run
 
-Examples live in the **git tree**. They are **not** installed by the PyPI wheel
-(`pip install hypercube-wtf` alone does not place these scripts on disk).
+These files live in the GitHub repository. They are not part of `pip install`
+— use the [Quick start](../README.md#quick-start) if you only want a snippet.
 
-From the **repository root** (after a Release wheel or local build):
+From a clone of HypercubeWTF (repository root), after installing the package:
 
 ```bash
 pip install hypercube-wtf
-# or, from this tree:  pip install ./python
+# or from this tree:  pip install .
 python python/examples/synthetic_classification.py
 ```
 
@@ -24,9 +23,9 @@ python python/examples/synthetic_classification.py
 
 - **Not** the C++ demos (`wtf_synth`, `wtf_mnist`) or the MNIST study write-ups.
   Those live under [`examples/`](../../examples/).
-- **Not** pytest. CI smoke is [`tests/test_basic.py`](../tests/test_basic.py).
+- **Not** automated tests. Package tests are [`tests/test_basic.py`](../tests/test_basic.py).
 - **Not** hard tasks. Synthetic multi-class fields are easy onboarding so the
-  episode API is obvious; do not cite their metrics as storefront results.
+  episode API is obvious; do not cite their metrics as research results.
 
 ## Going further
 
@@ -34,4 +33,4 @@ python python/examples/synthetic_classification.py
 |-------|------|
 | Full Python API | [`docs/Python_SDK.md`](../../docs/Python_SDK.md) |
 | C++ product guide | [`docs/CPP_SDK.md`](../../docs/CPP_SDK.md) |
-| Package install | [`README.md`](../README.md) |
+| Package readme | [`README.md`](../README.md) |

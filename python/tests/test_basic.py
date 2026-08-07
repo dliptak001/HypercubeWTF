@@ -80,12 +80,13 @@ class TestConstruction:
 
     def test_defaults(self):
         wtf = WTF(dim=5, history_depth=4)
-        assert wtf.T == wtf.N  # T=0 → N
+        assert wtf.T == 100
         assert wtf.bypass_reservoir is False
         assert wtf.readout_task == "regression"
         assert wtf.num_outputs == 1
 
     def test_t_zero_means_n(self):
+        # Explicit T=0 still expands to N (full-cube orbit override)
         wtf = WTF(dim=6, T=0, history_depth=4)
         assert wtf.T == 64
 

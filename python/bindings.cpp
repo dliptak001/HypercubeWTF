@@ -124,7 +124,7 @@ PYBIND11_MODULE(_core, m)
             py::arg("verbose")                  = false,
             py::arg("bias_scaling")             = 0.003f,
             py::arg("ic_seed")                  = 1ULL,
-            py::arg("episode_T")                = 0ULL,
+            py::arg("episode_T")                = 100ULL,
             py::arg("readout_slices")           = 1ULL,
             py::arg("collect_threads")          = 0ULL,
             py::arg("train_input_noise_sigma")  = 0.0f,

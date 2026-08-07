@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Synthetic multi-class fields → WTF episode → train → test (Python host).
+"""Synthetic multi-class fields → WTF episode → train → test.
 
-Mirrors the spirit of the C++ ``wtf_synth`` example using only the public
-``hypercube_wtf`` API — no CMake, no native example binaries.
+Mirrors the spirit of the C++ ``wtf_synth`` demo using the public
+``hypercube_wtf`` API only.
 
 Onboarding demo (small dim, short train). Not a paper validator.
 
-Requires a checkout of this file (examples are **not** installed by the
-PyPI wheel). From the repo root, after ``pip install hypercube-wtf`` (or
-``pip install ./python``)::
+This file lives in the GitHub repo under ``python/examples/`` — it is not part
+of ``pip install``. From a clone, repository root, after
+``pip install hypercube-wtf`` (or ``pip install ./python``)::
 
     python python/examples/synthetic_classification.py
 """
@@ -47,7 +47,7 @@ def main() -> None:
         seed=1,
         ic_seed=2,
         history_depth=8,
-        T=0,  # → N
+        T=100,
         input_scaling=0.03,
         readout_num_outputs=n_classes,
         readout_task="classification",

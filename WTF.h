@@ -14,8 +14,8 @@
 /// Episode / product knobs for @ref WTF.
 struct EpisodeConfig
 {
-    /// Drive-pass count. 0 means “use N after construction” (default T = N).
-    size_t T = 0;
+    /// Drive-pass count. 0 means “use N after construction”.
+    size_t T = 100;
 
     /// End-of-episode delay-line ages packed into features (default 1).
     size_t readout_slices = 1; // B

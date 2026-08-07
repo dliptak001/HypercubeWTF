@@ -183,9 +183,9 @@ moves is the **registration** of the field onto the graph.
 
 Do that for `T` passes and the reservoir experiences a **synthetic time
 series**: not new pixels from a camera, but the same global pattern seen under
-`T` successive addressings. Default **`T = N`** (set `episode.T = 0`) is one
-full tour of offsets. Larger `T` is allowed; the mask wraps and the tour
-repeats. That orbit is what the echo digests.
+`T` successive addressings. Larger `T` is allowed; the mask wraps and the tour
+repeats. Set `episode.T = 0` only if you want a full-cube orbit (`T = N` after
+construction). That orbit is what the echo digests.
 
 You still follow RC discipline at the end: you do **not** train on every
 intermediate state. After the last pass you read **once**.
@@ -230,7 +230,7 @@ x  (length N, fixed for this episode)
 |------|---------------|
 | **dim** | Cube dimension you choose (5…16); set as `reservoir.dim` |
 | **N** | Field length = 2<sup>dim</sup> (also one reservoir state slice) |
-| **T** | How many drive passes (`episode.T = 0` means “use N”) |
+| **T** | How many drive passes (`episode.T`; `0` expands to N at construct) |
 | **B** | How many end delay-line ages go into the feature vector (`readout_slices`) |
 | **M** | Delay-line depth (`history_depth`) |
 | **s0** | Frozen start state, length `N × M`, U[-0.5, 0.5] from `ic_seed` (not the weight seed); reloaded every episode |
@@ -348,7 +348,7 @@ int main() {
     cfg.reservoir.history_depth = 4;
     cfg.reservoir.seed = 1;
     cfg.ic_seed = 2;
-    cfg.episode.T = 0;                  // → T = N
+    cfg.episode.T = 100;
     cfg.episode.readout_slices = 1;     // B = 1
     cfg.readout.dim = 0;                // auto
     cfg.readout.num_outputs = 2;
@@ -406,7 +406,7 @@ Everything interesting is set **before** `WTF` is constructed.
 
 ```cpp
 struct EpisodeConfig {
-    size_t T = 0;                         // 0 → use N
+    size_t T;                             // drive passes; 0 → use N
     size_t readout_slices = 1;            // B
     size_t collect_threads = 0;           // 0 = auto (leave OS/UI some cores)
     float  train_input_noise_sigma = 0.f; // collect only
@@ -622,7 +622,7 @@ cfg.reservoir.dim = 7;                 // N = 128
 cfg.reservoir.history_depth = 8;
 cfg.reservoir.seed = 1;
 cfg.ic_seed = 2;
-cfg.episode.T = 0;                     // → N
+cfg.episode.T = 100;
 cfg.episode.readout_slices = 1;        // B
 cfg.episode.train_input_noise_sigma = 0.f;
 cfg.readout.dim = 0;                   // auto = dim + log2(B)

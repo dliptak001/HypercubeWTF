@@ -75,7 +75,7 @@ class WTF:
         Seed for frozen episode initial condition (separate from weight seed).
         Default: 1.
     T : int
-        Drive-pass count. 0 means use N after construction (default T = N).
+        Drive-pass count. 0 means use N after construction.
     readout_slices : int
         B end-of-episode ages packed into features (power of two, ≤ M).
         Default: 1.
@@ -151,7 +151,7 @@ class WTF:
         verbose: bool = False,
         bias_scaling: float = 0.003,
         ic_seed: int = 1,
-        T: int = 0,
+        T: int = 100,
         readout_slices: int = 1,
         collect_threads: int = 0,
         train_input_noise_sigma: float = 0.0,

@@ -36,7 +36,7 @@ static constexpr int kNumClasses = 6;
 // Live MakeWTFConfig() snapshot (keep in sync with the body below):
 //   reservoir: dim=7 N=128  M=8  seed=1
 //              SR_target=0.999  leak=1  in_scale=0.03  bias_scale=0.003
-//   episode:   T=0(=N)  B=1  ic_seed=2  train_input_noise_sigma=0  bypass=false
+//   episode:   T=100  B=1  ic_seed=2  train_input_noise=0  bypass=false
 //   readout:   seed=3  dim=0(auto)  num_outputs=6  epochs=100  batch=32
 //              lr_max=0.0015  lr_min_frac=0.01  threads=1  restore_best=false
 // Demo: train=64/class test=32/class field_noise_amp=0.18 CI_floor=0.70
@@ -59,8 +59,7 @@ static WTFConfig MakeWTFConfig()
     // Episode IC (separate from weight seed)
     cfg.ic_seed = 2;
 
-    // Episode: T = 0 means default T = N after construction
-    cfg.episode.T                       = 0;
+    cfg.episode.T                       = 100;
     cfg.episode.readout_slices          = 1;
     cfg.episode.train_input_noise_sigma = 0.0f;
     cfg.episode.bypass_reservoir        = false;
