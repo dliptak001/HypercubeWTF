@@ -34,3 +34,12 @@ data/*-ubyte.gz
 # Local agent notes
 .claude/
 CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+
