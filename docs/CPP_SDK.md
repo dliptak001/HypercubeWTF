@@ -10,8 +10,7 @@ You do not need to learn HypercubeESN or HypercubeCNN first. Link
 **`HypercubeWTFCore`**, include **`WTF.h`**, and work with **`WTF`**. Demos and
 packing helpers are optional recipes; they are not the product.
 
-This guide matches the public headers for **0.1.x**. The library is still early:
-APIs and defaults can move.
+This guide matches the public headers for **1.0.x**.
 
 **Who it is for:** anyone embedding WTF in a host (collect → train → predict),
 and anyone learning the stack with the same API the demos use.
