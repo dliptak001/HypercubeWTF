@@ -111,13 +111,6 @@ so the library invents a short synthetic orbit: it re-addresses the same fixed
 field over the cube for a number of passes, then samples **once** at the end.
 Geometry and weights stay put; only the registration of the field moves.
 
-| Piece | Trains? |
-|-------|---------|
-| Reservoir weights and bias | No — drawn once at construct |
-| Starting state **s0** (full delay line) | No — drawn once from `ic_seed`, reloaded every orbit |
-| Field packing | Caller-owned |
-| HCNN readout | **Yes** |
-
 Whether the dynamical encoding → CNN pipeline has **real product value** is
 still an open question. Early studies suggest interesting transformational
 behavior (see [Early observations](#early-observations-exploratory)).
