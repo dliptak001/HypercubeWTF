@@ -23,7 +23,9 @@ in ways a static pack-then-CNN path does not (see
 That is the product idea: take a static field, encode it through a short stretch
 of reservoir dynamics, and train a spatial readout on what remains.
 
-Full integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
+Full C++ integration guide: **[docs/CPP_SDK.md](docs/CPP_SDK.md)**.
+Python bindings (episode API): **[docs/Python_SDK.md](docs/Python_SDK.md)** ·
+[`python/`](python/).
 
 ---
 
@@ -240,11 +242,14 @@ examples/
   common/                    Optional packing / data-path helpers (not the product)
   synth/                     Synthetic multi-class demo
   mnist/                     MNIST demo + study write-ups
-docs/CPP_SDK.md              Canonical product API guide
+python/                      Python bindings (pybind11 + scikit-build; episode API)
+docs/CPP_SDK.md              Canonical C++ product API guide
+docs/Python_SDK.md           Python package API
 ```
 
 CMake library target: **`HypercubeWTFCore`**. Optional top-level targets:
-`wtf_smoke`, `wtf_synth`, `wtf_mnist`.
+`wtf_smoke`, `wtf_synth`, `wtf_mnist`. Python installs separately via
+`pip install ./python` (does not use CLion `cmake-build-*`).
 
 ---
 
@@ -252,7 +257,9 @@ CMake library target: **`HypercubeWTFCore`**. Optional top-level targets:
 
 | Doc | Role |
 |-----|------|
-| **[docs/CPP_SDK.md](docs/CPP_SDK.md)** | Product API — why explore, contracts, config, loop, pitfalls |
+| **[docs/CPP_SDK.md](docs/CPP_SDK.md)** | C++ product API — why explore, contracts, config, loop, pitfalls |
+| **[docs/Python_SDK.md](docs/Python_SDK.md)** | Python package — episode API, install, pickle |
+| [python/README.md](python/README.md) | PyPI-facing package readme |
 | [examples/README.md](examples/README.md) | Demo map and MNIST data notes |
 | [examples/mnist/WhiteNoiseFilter.md](examples/mnist/WhiteNoiseFilter.md) | White-noise field study (MNIST test bed) |
 | [examples/mnist/TrainingDataQualitySensitivity.md](examples/mnist/TrainingDataQualitySensitivity.md) | Training-set quality study (MNIST test bed) |

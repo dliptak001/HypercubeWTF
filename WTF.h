@@ -171,6 +171,33 @@ public:
     /// R² on the collected (training) set — not a test-set metric (regression).
     [[nodiscard]] double R2OnCollected() const;
 
+    /// Episode IC seed (construction-time; not the reservoir weight seed).
+    [[nodiscard]] uint64_t IcSeed() const { return ic_seed_; }
+
+    /// Train/collect-only field noise σ (0 = off).
+    [[nodiscard]] float TrainInputNoiseSigma() const { return train_input_noise_sigma_; }
+
+    // ── Readout persistence (thin forwards; same blob/HCNW contract as Readout) ──
+
+    [[nodiscard]] bool IsReadoutTrained() const { return readout_->IsTrained(); }
+    [[nodiscard]] std::vector<double> GetReadoutWeights() const { return readout_->Weights(); }
+    void SetReadoutWeights(std::vector<double> weights,
+                           ReadoutLoadMode mode = ReadoutLoadMode::Eval)
+    {
+        readout_->SetState(std::move(weights), mode);
+    }
+    void SaveReadoutHcnnModel(const std::string& path_stem) const
+    {
+        readout_->SaveHcnnModel(path_stem);
+    }
+    void LoadReadoutHcnnModel(const std::string& path_stem,
+                              ReadoutLoadMode mode = ReadoutLoadMode::Eval)
+    {
+        readout_->LoadHcnnModel(path_stem, mode);
+    }
+    [[nodiscard]] std::string ReadoutArchSummary() const { return readout_->ArchSummary(); }
+    [[nodiscard]] int ReadoutBestEpoch() const { return readout_->BestEpoch(); }
+
 private:
     /// One episode runner. Worker 0 aliases the primary reservoir + drive_
     /// (no second weight copy). Workers 1.. use owned clones.
