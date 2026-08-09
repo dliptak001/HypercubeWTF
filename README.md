@@ -143,9 +143,8 @@ x  (length-N field, host-packed, no natural time)
 The internal dynamics of this encoding appear to have some interesting
 properties we have only lightly explored — for example filtering white noise
 when present, acting closer to an identity map when noise is absent, and
-reducing sensitivity to training-data quality when noise is present. Treat that
-as early observation, not settled product behavior — the write-ups have the
-details and how we ran them:
+reducing sensitivity to training-data quality when noise is present. 
+The write-ups have the details and how we ran them:
 
 | Document | Question |
 |----------|----------|
