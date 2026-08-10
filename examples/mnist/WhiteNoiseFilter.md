@@ -69,11 +69,11 @@ already do most of the work. Under strong **additive white Gaussian noise
 this document: a **white-noise pre-filter for HypercubeCNN** that holds accuracy
 the identity path cannot.
 
-**MNIST is only the evaluation vehicle** — a lightweight, familiar, convenient dataset with a
-standard train/test split, not a product claim about digits or vision. The
-pipeline under test is pack → optional hypercube reservoir → HypercubeCNN on a
-length-N field; any static field that packs onto the cube is in scope for the
-same idea.
+**MNIST is only the evaluation vehicle** — a lightweight, familiar, convenient
+dataset with a standard train/test split, not a product claim about digits or
+vision. The pipeline under test is pack → optional hypercube reservoir →
+HypercubeCNN on a length-N field; any static field that packs onto the cube is
+in scope for the same idea.
 
 **Test accuracy here is not a ceiling on the substrate.** These studies use a
 **dim = 10** hypercube (*N* = 1024) so campaigns stay fast to iterate. That is a
@@ -89,30 +89,30 @@ vs bypass under noise), not absolute MNIST leaderboard scores.
 **With the reservoir on, HypercubeWTF matches pack-only accuracy on clean data
 and substantially outperforms pack-only under strong white test noise.**
 
+![MNIST test noise: Reservoir→HCNN vs Bypass](wtf_mnist_noise_comp.png)
+
 | Condition | Bypass (pack → readout) | Reservoir (pack → episode → readout) |
 |-----------|-------------------------|--------------------------------------|
 | Clean or mild AWGN | Strong (≈0.98) | Matchable (≈0.98 when tuned; see below) |
 | Strong AWGN (σ = 0.5) | Collapses (≈0.85) | Holds (≈0.93) |
 
 The gap at σ = 0.5 is about **eight to nine percentage points (pp)**, stable
-across noise seeds. That is the product-relevant result.
+across noise seeds.
 
 ---
 
 ## Protocol
 
-The **only** intentional factor in the headline A/B is reservoir **on vs off**.
-Within each noise condition, packing, training set, readout, and (when matched)
-noise seed are shared. The reservoir arm uses one fixed recipe (appendix).
-Bypass ignores reservoir dynamics; the hypercube still appears in **packing**
-the field onto the cube.
+In the main comparison, the only thing that changes is whether the reservoir is
+**on** or **off**. Within each noise condition, packing, training set, readout,
+and (when matched) noise seed are shared. The reservoir arm uses one fixed
+recipe. Bypass ignores reservoir dynamics.
 
 **Test noise** is i.i.d. Gaussian on every packed vertex after pack and before
-prediction — flat spectrum, Gaussian amplitudes, additive (evaluation protocol
-only). It is not training-set field noise and not geometric augmentation.
+prediction — flat spectrum, Gaussian amplitudes, additive (evaluation
+protocol only).
 
-**Train** stays clean. The head learns on clean features and is scored on clean
-or corrupted test fields — a domain-shift stress test, not matched noisy training.
+**Train** stays clean.
 
 ---
 
@@ -261,6 +261,8 @@ block.
 all near bypass.)
 
 ### Cross-σ snapshot (test accuracy)
+
+Three anchors from the logs. The continuous view is the chart under **The claim**.
 
 | Test noise | Bypass | Reservoir |
 |------------|--------|-----------|
