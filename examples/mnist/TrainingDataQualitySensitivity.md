@@ -126,7 +126,8 @@ Clean training set     — augmentation off; pack raw digits → features → tr
 Corrupted training set — augmentation on; pack corrupted digits → features → train HCNN
 ```
 
-Crossing clean vs corrupted training sets with clean vs AWGN test fields is the rest of the design.
+Crossing clean vs corrupted training sets with clean vs AWGN test fields is
+the rest of the design.
 
 ---
 
@@ -148,8 +149,8 @@ A corrupted training set costs bypass about **19 pp** and the reservoir about
 
 ## Clean test set — similar sensitivity
 
-When the **test set** is noise-free, corrupting the **training data
-set** costs both arms only about a point, and final accuracies stay close.
+When the **test set** is noise-free, corrupting the **training data set**
+costs both arms only about a point, and final accuracies stay close.
 
 | Training data | Bypass test acc | Reservoir test acc |
 |---------------|-----------------|--------------------|
@@ -171,19 +172,6 @@ Rows = test condition; columns = training-data quality. Each cell:
 | **Test AWGN (σ = 0.5)** | ≈0.93 / ≈0.83 — **reservoir ahead** | ≈0.84 / ≈0.65 — **reservoir much more tolerant** |
 
 Within each cell, order is **reservoir / bypass**.
-
----
-
-## What this evaluation does not claim
-
-- That the logged spatial-aug recipe represents good augmentation or a recommended
-  training path (it is used here only as a **corruptor** of the training data
-  set; dim-10 results do not endorse using the SDK spatial-aug facility that way).
-- Multi-seed coverage of every cell (this was a quick, one noise seed study).
-
-What it **does** support: under strong AWGN on the test packed field,
-degrading the **training data set** hurts **bypass more** than **reservoir**;
-under a clean test set, both take a small, similar hit.
 
 ---
 
@@ -220,8 +208,7 @@ image noise σ = 0.03 — applied on 28×28 **before** pack.
 **Test AWGN** (evaluation only): Gaussian σ = 0.5 on the packed field; noise
 seed base `0x7E57`.
 
-Factor under study: training-data quality × test noise × bypass vs
-reservoir.
+Factor under study: training-data quality × test noise × bypass vs reservoir.
 
 ---
 

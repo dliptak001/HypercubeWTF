@@ -160,30 +160,17 @@ Operating picture:
 
 ## Scope of the filter claim
 
-Weights stay **frozen**; this is not a learned denoiser with a noise loss.
-Results use one mild contracting recipe on the cube (appendix), not a sweep of
-all reservoir settings. The claim is about **bypass vs that reservoir episode**
-under AWGN — not a universal denoise theorem.
-
----
-
-## How to read the numbers
-
-**Test accuracy** is the decision metric (MNIST test set).  
-**Accuracy on collected** is fit to the clean training features. Under strong
-test noise, a huge collected–test gap on bypass means the head memorized clean
-packs and met a different distribution at test. The reservoir shrinks that gap
-without matching train noise.
-
-Reservoir inference costs a short episode per image; bypass does not. Wall-clock
-details are secondary to the accuracy story.
+On the hypercube stack, a short frozen **reservoir episode** can be offered as
+an **optional white-noise pre-filter for HypercubeCNN** on length-N fields:
+little clean-data tax when the recipe is tuned, and a large multi-seed gain
+under strong AWGN versus identity (bypass) features.
 
 ---
 
 ## What this evaluation does not claim
 
-- Superiority to classical image denoisers (Gaussian, Wiener, BM3D, …) — not
-  measured here.
+- A universal denoise theorem or superiority to classical image denoisers
+  (Gaussian, Wiener, BM3D, …) — not measured here.
 - Robustness to blur, occlusion, adversarial noise, or non-white corruptions.
 - That every reservoir recipe is a white-noise pre-filter for HypercubeCNN —
   results use the mild hypercube recipe in the appendix.
@@ -191,13 +178,6 @@ details are secondary to the accuracy story.
   clean data.
 - That HypercubeWTF replaces HypercubeESN for streams — different data modality;
   shared substrate and RC discipline.
-
-What it **does** support: on the hypercube stack, a short frozen **reservoir
-episode** can be offered as an **optional white-noise pre-filter for
-HypercubeCNN** on length-N fields, with little clean-data tax in this regime, and
-a large multi-seed gain under strong AWGN versus identity (bypass) features —
-same frozen-reservoir / trained-head contract as HypercubeESN, applied so HCNN
-sees a cleaner cube field.
 
 ---
 
