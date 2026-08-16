@@ -38,6 +38,8 @@ Project home: **[github.com/dliptak001/HypercubeWTF](https://github.com/dliptak0
   <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
 </p>
 
 HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to

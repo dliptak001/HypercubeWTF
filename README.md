@@ -41,6 +41,8 @@ Python bindings (episode API): **[docs/Python_SDK.md](docs/Python_SDK.md)** ·
   <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
 </p>
 
 HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
