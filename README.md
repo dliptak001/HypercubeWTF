@@ -64,7 +64,7 @@ as a first-class computational substrate.
   that generated the dynamics. The data never leaves the hypercube it was born
   on.
 
-Each product in the family is a different architecture on that same foundation:
+Each product in the family is a different architecture on that same foundation.
 
 ---
 
