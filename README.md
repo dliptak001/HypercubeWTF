@@ -31,7 +31,6 @@ Python bindings (episode API): **[docs/Python_SDK.md](docs/Python_SDK.md)** ·
 
 <p align="center">
   <strong>HypercubeAI ecosystem</strong><br/>
-  <sub>One geometry. Topology-native intelligence.</sub>
 </p>
 
 <p align="center">
@@ -44,12 +43,12 @@ Python bindings (episode API): **[docs/Python_SDK.md](docs/Python_SDK.md)** ·
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
-HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to map
-AI and ML strategies onto the hypercube as a computational substrate.
-
-Why the hypercube? A few properties keep
-showing up — and they explain why a frozen reservoir and a HypercubeCNN readout
-fit together so cleanly:
+HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
+systematically re-implement classical neural architectures on a Boolean
+hypercube topology instead of Euclidean grids or random graphs. The central
+thesis is “topology-native intelligence”: the hypercube’s algebraic structure
+(vertex-transitive symmetry, Hamming geometry, bitwise addressing) can serve
+as a first-class computational substrate.
 
 - **A topology you don’t store** — the graph is specified: connectivity is
   implicit in the vertex indices; with a seed and a few config scalars the whole
@@ -143,7 +142,7 @@ x  (length-N field, host-packed, no natural time)
 The internal dynamics of this encoding appear to have some interesting
 properties we have only lightly explored — for example filtering white noise
 when present, acting closer to an identity map when noise is absent, and
-reducing sensitivity to training-data quality when noise is present. 
+reducing sensitivity to training-data quality when noise is present.
 The write-ups have the details and how we ran them:
 
 | Document | Question |
