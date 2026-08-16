@@ -28,7 +28,6 @@ Project home: **[github.com/dliptak001/HypercubeWTF](https://github.com/dliptak0
 
 <p align="center">
   <strong>HypercubeAI ecosystem</strong><br/>
-  <sub>One geometry. Topology-native intelligence.</sub>
 </p>
 
 <p align="center">
@@ -41,12 +40,12 @@ Project home: **[github.com/dliptak001/HypercubeWTF](https://github.com/dliptak0
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
-HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to map
-AI and ML strategies onto the hypercube as a computational substrate.
-
-Why the hypercube? A few properties keep
-showing up — and they explain why a frozen reservoir and a HypercubeCNN readout
-fit together so cleanly:
+HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
+systematically re-implement classical neural architectures on a Boolean
+hypercube topology instead of Euclidean grids or random graphs. The central
+thesis is “topology-native intelligence”: the hypercube’s algebraic structure
+(vertex-transitive symmetry, Hamming geometry, bitwise addressing) can serve
+as a first-class computational substrate.
 
 - **A topology you don’t store** — the graph is specified: connectivity is
   implicit in the vertex indices; with a seed and a few config scalars the whole
