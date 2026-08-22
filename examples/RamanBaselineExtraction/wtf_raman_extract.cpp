@@ -11,7 +11,7 @@
 
 static constexpr const char* kSplit = "Validation";
 // Dataset file numbers: Validation/0.data.txt, Validation/42.data.txt, …
-static constexpr int kIndices[] = {1971, 1972, 1973, 1974};
+static constexpr int kIndices[] = {581, 582, 583, 584};
 static constexpr const char* kOutDir = "C:/HypercubeWTF/RamanModels/extracted";
 
 int main()
