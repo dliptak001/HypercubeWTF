@@ -1,15 +1,16 @@
 # HypercubeWTF examples
 
-This folder holds **two runnable demos** of HypercubeWTF.
+This folder holds **four runnable programs** built on HypercubeWTF.
 
 **What the product does (in plain terms):** take a fixed-size array of numbers
 (a “field”), run it through a **frozen** recurrent network on a hypercube
-(the *reservoir*), then train a small **HypercubeCNN** head to classify the
-result. The reservoir weights never learn; only the head does.
+(the *reservoir*), then train a small **HypercubeCNN** head to classify or
+regress the result. The reservoir weights never learn; only the head does.
 
-These demos own everything outside that core: inventing synthetic inputs,
-loading MNIST, laying images onto the field, and optional noise experiments.
-The library itself is collect → train → predict.
+These programs own everything outside that core: inventing synthetic inputs,
+loading MNIST, laying images onto the field, reading Raman spectra from disk,
+and optional noise experiments. The library itself is collect → train →
+predict.
 
 Build the project in **Release** (CLion or `cmake --build cmake-build-release`),
 then run the binary you care about.
@@ -18,10 +19,14 @@ then run the binary you care about.
 |---------|----------------|-------------------------|
 | `wtf_synth` | Quick check that the stack works | No |
 | `wtf_mnist` | Real images (handwritten digits) and the written studies | Yes — see below |
+| `wtf_raman` | Raman baseline regression | Yes — not shipped |
+| `wtf_raman_extract` | Write selected baseline extracts | Yes — needs a trained stem |
 
 Settings live at the **top of each program’s `.cpp` file**: product options in
 `MakeWTFConfig()`, and a few demo-only constants just under that (how many
 samples, optional noise switches, pass/fail floor for continuous integration).
+The two Raman programs share `MakeBaseConfig()` from
+`RamanBaselineExtraction/BaselineExtractor.h`.
 
 ---
 
@@ -84,6 +89,30 @@ Both compare two feature paths that share the same packing and head:
 
 ---
 
+## `wtf_raman` — Raman baseline extraction
+
+A Raman spectrum is a line of 2048 amplitudes: sharp molecular peaks
+sitting on a slow, unwanted background. This example asks the reservoir
+and a one-layer, one-channel readout to estimate that background. The cube
+is the same length as the spectrum (`N = 2048`, dim 11), so each bin is
+already one address — there is nothing to pack.
+
+The spectra are about 1 GB and are not in the repository. The programs
+look only at:
+
+```text
+C:\HypercubeWTF\RamanSpectraLCOHard\
+```
+
+`wtf_raman` trains and scores, printing the training RMSE after every
+epoch. `wtf_raman_extract` writes selected `.pred.txt` rows from the saved
+readout. `plot_extracted.py` overlays them.
+
+Task write-up, results, and the held-out overlay:
+[`RamanBaselineExtraction/README.md`](RamanBaselineExtraction/README.md).
+
+---
+
 ## Folder layout
 
 ```text
@@ -92,6 +121,7 @@ examples/
   common/                   # shared helpers for the demos
   synth/wtf_synth.cpp       # synthetic smoke demo
   mnist/                    # MNIST demo + study docs
+  RamanBaselineExtraction/  # Raman baseline regression + write-up
 ```
 
 To add another demo: create `examples/<name>/`, add a target in the root

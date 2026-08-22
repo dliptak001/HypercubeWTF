@@ -447,8 +447,11 @@ demos tune these widely, so treat “typical” as a starting band, not a recipe
 | `restore_best_epoch` | Keep best-epoch weights (Readout default true; demos often false) |
 | `seed` | Readout weight init |
 
-Deeper architecture fields (`num_layers`, pooling, activation, …) live on
-`ReadoutConfig` in `Readout.h`. Classification hosts often leave them alone.
+Deeper fields (`num_layers`, pooling, activation, batch-norm, optimizer,
+holdout fraction, `epoch_tick`) live on `ReadoutConfig` in `Readout.h`.
+Classification hosts often leave them alone. `epoch_tick` is an optional
+callback fired after each batch-training epoch with the 1-based epoch and the
+training-set error; the Raman example uses it to print a per-epoch RMSE.
 
 ### After construct — sizes and inspection
 
@@ -458,6 +461,7 @@ explicit WTF(const WTFConfig& cfg);
 wtf.N();  wtf.T();  wtf.B();  wtf.M();
 wtf.FeatureSize();      // B * N
 wtf.NumCollected();
+wtf.CollectedFeatures(); // span, sample-major, NumCollected() * FeatureSize()
 wtf.NumOutputs();
 wtf.CollectThreads();   // configured preference (0 = auto)
 wtf.BypassReservoir();

@@ -157,8 +157,79 @@ point. The write-up is
 [`examples/mnist/TrainingDataQualitySensitivity.md`](examples/mnist/TrainingDataQualitySensitivity.md).
 
 Both studies use MNIST on small cubes because it is handy to pack and
-run, not because we are chasing digit accuracy. Runnable programs live
-under [`examples/`](examples/README.md).
+run, not because we are chasing digit accuracy.
+
+---
+
+## Raman baseline extraction (a vibrational spectroscopy application)
+
+The first real-world test is Raman spectra: recover the slow
+fluorescence background under sharp molecular peaks without
+lifting the baseline into the bands or cutting trenches beneath
+them. Polynomials, asymmetric least squares, and ordinary
+convolutional nets tend to follow the empty stretches well and then
+fail where it matters, under peaks and peak clusters. Analysts have
+worked around that for decades with spectrum-specific cleanup,
+because no method identifies and extracts a true baseline across a
+broad range of peak intensities and baseline characteristics
+without occasional, and often frequent, human intervention.
+
+WTF appears to have solved that problem (albeit on synthetic data
+only so far).
+
+Trained for 60 epochs on the LCOHard set — 10,000 synthetic LiCoO₂
+(lithium cobalt oxide) spectra — it scores a validation RMSE of
+4.76 counts on 2,000 held-out spectra whose baselines span
+hundreds of counts.
+
+Below are four held-out validation spectra: grey is the raw
+spectrum, red the true baseline, blue the extract. For all four
+shown here, and for each of the remaining 1996 validation spectra
+not shown, baseline identification is, **WITHOUT EXCEPTION**,
+quite remarkable.
+
+And it does this with the thin readout the project aims for: one
+HypercubeCNN layer, one convolutional channel, no pooling.
+
+In our judgment this at least matches the best of the established
+techniques on spectra like these, and very likely beats them.
+
+![Held-out validation extract, spectra 581 through 584](examples/RamanBaselineExtraction/extracted_baselines_wtf.png)
+
+### Three hosts, one floor
+
+The Reservoir is the whole preprocessor here: one orbit, then the
+readout. It is the Cascade's second stage run alone — same seed,
+same spectral radius, same history depth, same pass count — and on
+spectra like these it is already enough. The etalon-only sibling
+([HypercubeEtalon](https://github.com/dliptak001/HypercubeEtalon))
+scores 4.77 on the same split; the two-stage
+([HypercubeCascade](https://github.com/dliptak001/HypercubeCascade))
+scores 4.82. Three preprocessors that share no mechanism — a transit,
+an orbit, and the two in series — carry the same one-layer,
+one-channel readout to the same floor, and their overlays are
+indistinguishable.
+
+Real spectra, however, are not nearly this clean. Low laser power,
+short integration times, and weak scatterers all put noise on the
+spectrum, and that is where a baseline extractor has to earn its
+keep.
+
+That is where the hosts should separate. The MNIST white-noise study
+([`examples/mnist/WhiteNoiseFilter.md`](examples/mnist/WhiteNoiseFilter.md))
+found this reservoir a near-unity passthrough on clean fields and a
+filter that holds accuracy as the noise rises; the Cascade's study
+found the two-stage path pulling ahead of the etalon alone from
+moderate noise up.
+
+That is the next experiment.
+
+The overlay and the training profile are in
+[`examples/RamanBaselineExtraction/`](examples/RamanBaselineExtraction/README.md).
+
+Runnable programs live under [`examples/`](examples/README.md).
+
+The Raman spectra themselves (about 1 GB) are not in this repository.
 
 ---
 
