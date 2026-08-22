@@ -84,6 +84,13 @@ public:
     [[nodiscard]] size_t M() const { return M_; }
     [[nodiscard]] size_t FeatureSize() const { return B_ * n_; }
     [[nodiscard]] size_t NumCollected() const { return num_collected_; }
+    /// Collected feature rows, sample-major, length @ref NumCollected() *
+    /// @ref FeatureSize(). Empty when nothing has been collected. Valid until
+    /// the next @ref CollectEpisode / @ref CollectEpisodes / @ref ClearCollected.
+    [[nodiscard]] std::span<const float> CollectedFeatures() const
+    {
+        return collected_features_;
+    }
     [[nodiscard]] size_t NumOutputs() const { return readout_->NumOutputs(); }
     /// Configured collect-thread preference (0 = auto). Actual workers used on
     /// a given bulk collect are min(resolved, sample_count).

@@ -68,4 +68,18 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     wtf_add_exe(wtf_mnist
         SOURCES examples/mnist/wtf_mnist.cpp
         INCLUDES ${PROJECT_SOURCE_DIR}/examples/mnist)
+
+    wtf_add_exe(wtf_raman
+        SOURCES
+            examples/RamanBaselineExtraction/wtf_raman.cpp
+            examples/RamanBaselineExtraction/BaselineExtractor.cpp
+            examples/RamanBaselineExtraction/RamanDataset.cpp
+        INCLUDES ${PROJECT_SOURCE_DIR}/examples/RamanBaselineExtraction)
+    wtf_add_exe(wtf_raman_extract
+        SOURCES
+            examples/RamanBaselineExtraction/wtf_raman_extract.cpp
+            examples/RamanBaselineExtraction/BaselineExtractor.cpp
+            examples/RamanBaselineExtraction/RamanDataset.cpp
+            examples/RamanBaselineExtraction/RamanExtract.cpp
+        INCLUDES ${PROJECT_SOURCE_DIR}/examples/RamanBaselineExtraction)
 endif()
