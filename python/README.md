@@ -1,28 +1,37 @@
-# HypercubeWTF
+# Hypercube WTF
 
-**HypercubeWTF** is for high-dimensional data that has no natural clock —
-spectra, sensor frames, packed images, stills. Those are the same kinds of
-static fields people usually feed a spatial CNN, an MLP, or a similar
-feed-forward stack. Classical reservoir computing wants a stream: a new
-low-dimensional sample each step, a state that evolves through real time. A
-still field offers no such sequence — the pattern is already complete — so
-HypercubeWTF repurposes the reservoir idea by inventing a short stretch of
-synthetic time. It places your length-N field on a **frozen** hypercube
-reservoir, drives a short orbit that encodes the field in the dynamics, and
-trains a small [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN) head
-on the **end state only**. The CNN head never sees the original field — it sees
-what the reservoir dynamics leave behind. Those dynamics are not a neutral pipe:
-early work suggests they can filter, reshape, and otherwise transform the field
-in ways a static pack-then-CNN path does not (see
-[Early observations](#early-observations-exploratory) below).
-
-That is the product idea: take a static field, encode it through a short stretch
-of reservoir dynamics, and train a spatial readout on what remains.
-
-This package is the **Python** surface for that product (`import hypercube_wtf`).
+This package is the **Python** surface for HypercubeWTF
+(`import hypercube_wtf`).
 Full API reference: **[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)**.
 C++ integration guide: **[docs/CPP_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/CPP_SDK.md)**.
 Project home: **[github.com/dliptak001/HypercubeWTF](https://github.com/dliptak001/HypercubeWTF)**.
+
+HypercubeWTF processes spatial data of the kind presented to a CNN.
+It is built from three core classes.
+
+The **WTF** class wraps the other two and manages training and
+prediction.
+
+The other two form a pipeline: reservoir → readout.
+
+The **Reservoir** class is a preprocessing stage that consumes input
+patterns, drives a short synthetic orbit on a frozen hypercube
+reservoir, and returns a field with the same dimensions as the input.
+
+The **Readout** class is a small HypercubeCNN that classifies or
+regresses that field.
+
+This is reservoir computing, aimed at data that has no time.
+
+The point of this experiment is to see if a preprocessing stage in
+front of HypercubeCNN outperforms HypercubeCNN by itself. HypercubeEtalon
+has the same goal; it just does it a slightly different way, using an
+**etalon** transit with no time at all, whereas here the preprocessor is
+a **reservoir** with synthetic time. The aim is a hypercube preprocessor
+effective enough that the readout can be a single layer with a single
+convolutional channel and no pooling. Then training is fast, the memory
+footprint is small, and little to no architectural engineering is
+required for the CNN.
 
 ---
 
@@ -40,6 +49,8 @@ Project home: **[github.com/dliptak001/HypercubeWTF](https://github.com/dliptak0
   <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
 </p>
 
 HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
@@ -83,80 +94,77 @@ The monologue won — and the brand gained a little personality :-)
 
 ---
 
-## What is HypercubeWTF?
+## The Reservoir
 
-[HypercubeESN](https://github.com/dliptak001/HypercubeESN) processes
-**temporal streams**. [HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)
-processes **spatial data** with a trainable conv stack on the cube. HypercubeWTF
-also takes spatial data, but the conv stack is not first in line: each field
-first passes through a **dynamical encoder** (the reservoir). The CNN head never
-sees the original field; it sees an encoded end-of-orbit state produced by the
-reservoir dynamics.
+HypercubeESN and HypercubeCNN are two examples of how solutions can
+be built on that substrate. HypercubeESN drives a frozen hypercube
+reservoir with a stream and reads the state out along the way.
+HypercubeCNN trains a convolutional stack directly on a static cube
+field. WTF sits between them: the ESN's reservoir, aimed at the CNN's
+data.
 
-In classical reservoir computing (and in HypercubeESN):
+The Reservoir is a fork of the HypercubeESN core: one neuron per
+vertex, frozen recurrent weights over the cube's edges, a delay line
+of M slices, tanh activation, and a frozen initial condition that is
+reloaded before every sample. Nothing in it is ever trained.
 
-- Recurrent weights are **frozen**
-- Only a **readout** is trained
-- Nonlinear dynamics expand and mix the drive into a rich state
+A stream has a next sample. A still field does not. So WTF invents a
+short stretch of synthetic time: it re-addresses the same fixed field
+over the cube for T passes and samples the reservoir once at the end.
+Geometry and weights stay put; only the registration of the field
+moves. The orbit goes something like this.
 
-WTF uses that same idea on a **still field**. There is no natural next sample,
-so the library invents a short synthetic orbit: it re-addresses the same fixed
-field over the cube for a number of passes, then samples **once** at the end.
-Geometry and weights stay put; only the registration of the field moves.
+    Leave the caller's field alone. The drive is built in a scratch
+    buffer.
 
-Whether the dynamical encoding → CNN pipeline has **real product value** is
-still an open question. Early studies suggest interesting transformational
-behavior (see [Early observations](#early-observations-exploratory)).
+    Reload the reservoir's frozen initial condition.
 
----
+    LOOP:
 
-## Pipeline
+        Remap the field by xor with the pass index: vertex v is driven
+        by the field value at v xor c.
 
-```text
-x  (your length-N field — already on the cube, no natural time)
-    │
-    ▼
- frozen hypercube reservoir runs a short orbit
-    │
-    ▼
- end-of-orbit features → HypercubeCNN → logits / values
-```
+        Inject that remapping. Step the reservoir: every vertex forms
+        the weighted sum of its neighbors and its drive, and writes
+        tanh of that sum.
 
-- Cube size from **dim** (N = 2<sup>dim</sup>; dim 5…16).
-- Only the readout trains.
-- Everyday loop in this package:
-  `collect_episodes` → `train` → `predict` / `predict_class`,
-  or one-shot `fit` (collect + train).
+        Increment the pass index.
 
-Unlike HypercubeESN’s Python API, there is no stream of small samples over real
-time and no next-step `fit` on a 1D signal. Each sample is one full field; the
-“time” is the short synthetic orbit; the CNN only ever sees the state at the end.
+    GOTO LOOP
 
-Full method list and knobs:
-**[docs/Python_SDK.md](https://github.com/dliptak001/HypercubeWTF/blob/main/docs/Python_SDK.md)**.
+    After T passes, the reservoir's live output is the feature field.
+    That is what the Readout sees.
+
+Every episode starts from the same frozen initial condition, so the
+feature field depends on the input field and nothing else. Bulk
+collection fans independent episodes across worker reservoirs that
+share the frozen weights.
 
 ---
 
-## Early observations (exploratory)
+## White noise filter
 
-The internal dynamics of this encoding appear to have some interesting
-properties we have only lightly explored — for example filtering white noise
-when present, acting closer to an identity map when noise is absent, and
-reducing sensitivity to training-data quality when noise is present. 
-The write-ups have the details and how we ran them:
+The reservoir preprocessor behaves as a near unity passthrough at low
+to no white noise levels, and offers a meaningful filtering effect
+at moderate to high noise levels. The write-up is
+[`examples/mnist/WhiteNoiseFilter.md`](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/WhiteNoiseFilter.md).
 
-| Document | Question |
-|----------|----------|
-| [WhiteNoiseFilter.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/WhiteNoiseFilter.md) | Noisy test fields: does the reservoir orbit help vs pack-only → CNN? |
-| [TrainingDataQualitySensitivity.md](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/TrainingDataQualitySensitivity.md) | Degraded training data: how much does each path lose? |
+![MNIST test noise: Reservoir→HCNN vs Bypass](https://raw.githubusercontent.com/dliptak001/HypercubeWTF/main/examples/mnist/wtf_mnist_noise_comp.png)
 
-The studies use MNIST on small cubes because it is handy to pack and run, not
-because we are chasing digit accuracy. A more rigorous study is still needed
-before treating any of those results as settled. You can reproduce the same
-ideas from Python with this package (pack fields yourself, then collect, train,
-and predict). The original write-ups and C++ demos that produced the numbers
-live under
-[`examples/mnist/`](https://github.com/dliptak001/HypercubeWTF/tree/main/examples/mnist).
+---
+
+## Training-data quality
+
+The same orbit also softens the blow of a degraded training set. With
+heavy white noise on the test fields, corrupting the training set
+costs the pack-only path about 19 points of test accuracy and the
+reservoir path about 8. On clean test fields both paths lose about a
+point. The write-up is
+[`examples/mnist/TrainingDataQualitySensitivity.md`](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/mnist/TrainingDataQualitySensitivity.md).
+
+Both studies use MNIST on small cubes because it is handy to pack and
+run, not because we are chasing digit accuracy. Runnable programs live
+under [`examples/`](https://github.com/dliptak001/HypercubeWTF/blob/main/examples/README.md).
 
 ---
 
@@ -335,6 +343,8 @@ More notes:
 - **[HypercubeESN](https://github.com/dliptak001/HypercubeESN)** — echo-state / reservoir computing on streams; same cube + HCNN readout family.
 - **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)** — cube-native conv stack; WTF’s trainable head.
 - **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)** — Hopfield-style dynamics on the cube.
+- **[HypercubeEtalon](https://github.com/dliptak001/HypercubeEtalon)** — the etalon transit alone; a preprocessor with no time at all.
+- **[HypercubeCascade](https://github.com/dliptak001/HypercubeCascade)** — etalon transit then reservoir orbit, in series, on one cube.
 
 ---
 
