@@ -51,6 +51,8 @@ required for the CNN.
   <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeLCN"><strong>HypercubeLCN</strong></a>
 </p>
 
 HypercubeWTF is an experiment in the **HypercubeAI** project — our quest to
@@ -416,6 +418,7 @@ More notes:
 - **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)** — Hopfield-style dynamics on the cube.
 - **[HypercubeEtalon](https://github.com/dliptak001/HypercubeEtalon)** — the etalon transit alone; a preprocessor with no time at all.
 - **[HypercubeCascade](https://github.com/dliptak001/HypercubeCascade)** — etalon transit then reservoir orbit, in series, on one cube.
+- **[HypercubeLCN](https://github.com/dliptak001/HypercubeLCN)** — locally connected network on the cube; every weight trained, no frozen stages.
 
 ---
 
