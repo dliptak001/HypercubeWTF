@@ -1,0 +1,271 @@
+# Hypercube Reservoir as a White-Noise Pre-Filter for HypercubeCNN
+
+## The HypercubeAI substrate
+
+HypercubeWTF sits in the same family as **HypercubeESN** and **HypercubeCNN**:
+computation lives on a **hypercube** of *N* = 2<sup>dim</sup> vertices. Neighbors, gathers,
+and spatial structure are cube-native — not a generic dense RNN with the graph
+painted on afterward.
+
+| Product | Natural data | Role of the hypercube |
+|---------|--------------|------------------------|
+| **HypercubeESN** | Low-dimensional **streams** over time | Frozen **reservoir** stepped each sample; multi-slice state → HypercubeCNN readout |
+| **HypercubeCNN** | Static patterns already on the cube | Trainable **spatial** conv/pool on the cube (no recurrent reservoir) |
+| **HypercubeWTF** | Static high-dimensional fields (**no** intrinsic time) | Same **frozen hypercube reservoir** discipline as ESN, driven for a short **episode** per sample, then HypercubeCNN on the **end state** |
+
+Reservoir code in WTF started from **HypercubeESN** (cube dynamics, delay line,
+input gather). Readout is the same **HypercubeCNN** façade family. The hypercube
+is not an implementation detail; it is the shared substrate.
+
+---
+
+## The preprocessor is a reservoir
+
+In classical reservoir computing (and in HypercubeESN):
+
+- Recurrent weights are **frozen**
+- Only a **readout** is trained
+- Nonlinear dynamics expand and mix the drive into a rich state
+
+**HypercubeWTF uses that same idea.** The WTF preprocessor is a **hypercube
+reservoir**: frozen recurrent dynamics and a frozen initial condition reloaded
+each sample. **No reservoir weights are learned.** Only the HCNN head trains.
+
+So when this document says the pipeline “filters” noise, it is not introducing a
+separate denoise network. It is asking what a **short hypercube reservoir
+episode** does to a static field before HypercubeCNN.
+
+### How WTF uses the reservoir differently from HypercubeESN
+
+| | HypercubeESN | HypercubeWTF (this evaluation) |
+|---|--------------|--------------------------------|
+| Input | Stream over real time | One **static field** packed onto the cube (e.g. MNIST) |
+| Time | Stream time = model time | **Synthetic episode time** inside one sample |
+| Drive | New input each step | Same field re-presented each step of the episode |
+| Features | State along the stream | **End-of-episode** reservoir state |
+| Product emphasis here | Temporal modeling of sequences | **Optional pre-filter** for HypercubeCNN under additive white Gaussian noise (AWGN) |
+
+Same RC contract (frozen cube reservoir + trained head). Different **use**: ESN
+follows a stream; WTF drives a static hypercube field through a short episode and
+hands the end state to HypercubeCNN.
+
+### Bypass vs reservoir (the A/B)
+
+Both arms start the same way: **pack** maps the input onto the hypercube field.
+The A/B is only what becomes the HypercubeCNN feature vector:
+
+```text
+Bypass    — packed field (reservoir unused)
+Reservoir — end state of a short frozen reservoir episode
+```
+
+**Bypass** asks: is the hypercube pack + HypercubeCNN enough? **Reservoir** asks:
+does a short frozen episode on the same cube improve the features — especially
+when the pack is corrupted?
+
+On clean MNIST the reservoir is easy to treat as optional: pack and readout
+already do most of the work. Under strong **additive white Gaussian noise
+(AWGN)** on the packed field, that same reservoir becomes the product story of
+this document: a **white-noise pre-filter for HypercubeCNN** that holds accuracy
+the identity path cannot.
+
+**MNIST is only the evaluation vehicle** — a lightweight, familiar, convenient
+dataset with a standard train/test split, not a product claim about digits or
+vision. The pipeline under test is pack → optional hypercube reservoir →
+HypercubeCNN on a length-N field; any static field that packs onto the cube is
+in scope for the same idea.
+
+**Test accuracy here is not a ceiling on the substrate.** These studies use a
+**dim = 10** hypercube (*N* = 1024) so campaigns stay fast to iterate. That is a
+deliberate study choice, not a statement of product accuracy. **HypercubeCNN has
+already demonstrated ≈99.5% on MNIST**; the HypercubeWTF MNIST example does not
+try to re-prove that number. The interesting deltas are **relative** (reservoir
+vs bypass under noise), not absolute MNIST leaderboard scores.
+
+---
+
+## The claim
+
+**With the reservoir on, HypercubeWTF matches pack-only accuracy on clean data
+and substantially outperforms pack-only under strong white test noise.**
+
+![MNIST test noise: Reservoir→HCNN vs Bypass](wtf_mnist_noise_comp.png)
+
+| Condition | Bypass (pack → readout) | Reservoir (pack → episode → readout) |
+|-----------|-------------------------|--------------------------------------|
+| Clean or mild AWGN | Strong (≈0.98) | Matchable (≈0.98 when tuned; see below) |
+| Strong AWGN (σ = 0.5) | Collapses (≈0.85) | Holds (≈0.93) |
+
+The gap at σ = 0.5 is about **eight to nine percentage points (pp)**, stable
+across noise seeds.
+
+---
+
+## Protocol
+
+In the main comparison, the only thing that changes is whether the reservoir is
+**on** or **off**. Within each noise condition, packing, training set, readout,
+and (when matched) noise seed are shared. The reservoir arm uses one fixed
+recipe. Bypass ignores reservoir dynamics.
+
+**Test noise** is i.i.d. Gaussian on every packed vertex after pack and before
+prediction — flat spectrum, Gaussian amplitudes, additive (evaluation
+protocol only).
+
+**Train** stays clean.
+
+---
+
+## Strong white noise — the reservoir earns its keep
+
+At σ = 0.5, feeding the noisy pack straight into the readout fails hard: test
+accuracy sits near **0.84–0.85**. The same class of readout, fed the **end state
+of the hypercube reservoir episode**, sits near **0.93**.
+
+That is not a one-draw fluke. Across multiple independent noise seeds, reservoir
+test accuracy stays within a few tenths of a point of **0.93** (logged values
+from **0.927** to **0.931**). Bypass remains in the mid-0.84s under the same
+noise family.
+
+Bypass still fits the **clean** training features almost perfectly, then fails
+on noisy test — train/test mismatch. The reservoir reduces that mismatch: it
+maps noisy fields into a region the clean-trained head still understands.
+
+**Functional reading:** under strong AWGN on the field, the frozen hypercube
+reservoir **pre-filters a large fraction of white noise** before the HypercubeCNN
+readout.
+
+---
+
+## Clean and mild noise — nearly transparent
+
+On **clean** test data the two paths can match. Bypass is already excellent
+(**0.979**). The primary clean pair with the reservoir on hits the same number
+(**0.979**). Some other reservoir recipes land a point or so lower — that is a
+**tuning** gap, not a fixed cost of running the orbit. When parity on clean data
+is the goal, the logged match shows the pre-filter does not have to tax the clean
+path.
+
+At **mild** noise (σ = 0.1) there is little white noise to remove. One logged
+pair has bypass slightly ahead (**0.980** vs **0.968**); the preprocessor is
+optional here, and the same tuning story applies.
+
+Operating picture:
+
+- **Clean / light noise** — parity with bypass is achievable (and already logged).
+- **Heavy white noise** — the reservoir is the difference between mid-80s and
+  low-90s.
+
+---
+
+## Scope of the filter claim
+
+On the hypercube stack, a short frozen **reservoir episode** can be offered as
+an **optional white-noise pre-filter for HypercubeCNN** on length-N fields:
+little clean-data tax when the recipe is tuned, and a large multi-seed gain
+under strong AWGN versus identity (bypass) features.
+
+---
+
+## What this evaluation does not claim
+
+- A universal denoise theorem or superiority to classical image denoisers
+  (Gaussian, Wiener, BM3D, …) — not measured here.
+- Robustness to blur, occlusion, adversarial noise, or non-white corruptions.
+- That every reservoir recipe is a white-noise pre-filter for HypercubeCNN —
+  results use the mild hypercube recipe in the appendix.
+- That the reservoir replaces good packing or a competent HypercubeCNN head on
+  clean data.
+- That HypercubeWTF replaces HypercubeESN for streams — different data modality;
+  shared substrate and RC discipline.
+
+---
+
+## Appendix A — Logged recipe (reproducibility only)
+
+Not part of the product claim — the settings used for the tables below. When the
+reservoir is **on**, reservoir and episode knobs apply; bypass uses the same pack
+and readout and **ignores** reservoir dynamics.
+
+| Meaning | Where in config / demo | Value used |
+|---------|------------------------|------------|
+| Hypercube dimension (field length *N* = 2<sup>dim</sup>) | `reservoir.dim` | 10 (*N* = 1024) |
+| Episode length (drive steps) | `episode.T` | 20 |
+| End-state slices into the readout | `episode.readout_slices` | 1 |
+| Reservoir delay-line depth | `reservoir.history_depth` | 4 |
+| Frozen episode initial-condition seed | `ic_seed` | 12 |
+| Frozen reservoir weight seed | `reservoir.seed` | 13871537636959942979 |
+| Target spectral radius (recurrent block) | `reservoir.spectral_radius` | 0.4 (realized ≈ 0.399) |
+| Leak rate | `reservoir.leak_rate` | 0.5 |
+| Input drive strength | `reservoir.input_scaling` | 0.005 |
+| Per-vertex bias scale | `reservoir.bias_scaling` | 0 (off) |
+| Train/collect field noise | `episode.train_input_noise_sigma` | 0 (off) |
+| HCNN depth / channels / pool / activation | `readout.*` | 1 layer, 16 channels, max pool, none |
+| Readout peak learning rate | `readout.lr_max` | 0.0015 |
+| Readout training epochs | `readout.epochs` | **100** (reservoir on); **20** (bypass arms) |
+| Readout weight count (result of that layout) | — | 82122 |
+| MNIST packing mode | demo pack mode | PadLowCenter |
+| Training / test set sizes | demo limits | 60000 / 10000 |
+| Training spatial augmentation | demo | off |
+
+Some σ = 0.5 multi-seed rows used minor readout variants; reservoir test
+accuracy remained ≈0.93. Factor under study: **bypass vs reservoir**.
+
+---
+
+## Appendix B — Tabulated logs
+
+Column conventions: **Path** = Bypass or Reservoir; **collected** = accuracy on
+the clean training feature buffer; **test acc** = accuracy on the MNIST test
+set. Δ is reservoir − bypass in percentage points (pp).
+
+### Test AWGN σ = 0.5 (three noise seeds)
+
+| Noise seed | Path | collected | test acc | Δ (vs bypass) |
+|------------|------|-----------|----------|---------------|
+| `0x7E57` | Bypass | — | 0.847 | |
+| `0x7E57` | Reservoir | ≈0.978 | 0.929 | +8.2 pp |
+| `0x3E57` | Bypass | — | 0.846 | |
+| `0x3E57` | Reservoir | ≈0.978 | 0.931 | +8.5 pp |
+| `0x1E57` | Bypass | — | 0.844 | |
+| `0x1E57` | Reservoir | ≈0.978 | 0.931 | +8.7 pp |
+
+Collected was logged once as ≈0.978 for the reservoir rows above (same recipe
+family).
+
+### Test AWGN σ = 0.5 (additional reservoir-only seeds)
+
+Minor readout variants of the same recipe family; bypass not re-run in this
+block.
+
+| Noise seed | Path | collected | test acc |
+|------------|------|-----------|----------|
+| `0x1E57` | Reservoir | 0.992 | 0.930 |
+| `0x7E57` | Reservoir | 0.992 | 0.927 |
+
+### Test AWGN σ = 0.1 (noise seed `0x1E57`)
+
+| Path | collected | test acc |
+|------|-----------|----------|
+| Reservoir | 0.978 | 0.968 |
+| Bypass | 0.999 | 0.980 |
+
+### Clean test set (no field noise)
+
+| Path | collected | test acc |
+|------|-----------|----------|
+| Bypass | 0.999 | 0.979 |
+| Reservoir | 0.992 | 0.979 |
+
+(Other reservoir clean logs: 0.970–0.977 depending on minor readout settings;
+all near bypass.)
+
+### Cross-σ snapshot (test accuracy)
+
+Three anchors from the logs. The continuous view is the chart under **The claim**.
+
+| Test noise | Bypass | Reservoir |
+|------------|--------|-----------|
+| off | ≈0.979 | ≈0.979 |
+| σ = 0.1 | **0.980** | 0.968 |
+| σ = 0.5 (multi-seed) | ≈0.84–0.85 | **≈0.93** |

@@ -1,0 +1,45 @@
+# Build
+cmake-build-*/
+build/
+Build/
+build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Testing/
+*.exe
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+*.pdb
+
+# IDE
+.idea/
+*.iml
+.vs/
+.vscode/
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MNIST IDX binaries (keep data/README.md; files are large)
+data/*-ubyte
+data/*-ubyte.gz
+
+# Local agent notes
+.claude/
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+
